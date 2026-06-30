@@ -4,3 +4,6 @@ google-adk
 httpx
 python-dotenv
 firebase-admin
+google-auth-oauthlib
+google-api-python-client
+google-cloud-pubsub
