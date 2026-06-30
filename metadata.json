@@ -1,0 +1,8 @@
+{
+  "name": "10xVerify.AI",
+  "description": "AI-Powered Vendor, Partner & Business Due Diligence Platform",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
+

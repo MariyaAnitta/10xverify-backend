@@ -1,0 +1,6 @@
+fastapi>=0.133.0
+uvicorn
+google-adk
+httpx
+python-dotenv
+firebase-admin
