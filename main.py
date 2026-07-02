@@ -130,18 +130,7 @@ def calculate_metrics(vendors):
         "complianceAlerts": alerts
     }
 
-email_listener_future = None
-
-@app.on_event("startup")
-async def startup_event():
-    global email_listener_future
-    loop = asyncio.get_running_loop()
-    email_listener_future = start_email_listener(loop)
-
-@app.on_event("shutdown")
-async def shutdown_event():
-    if email_listener_future:
-        email_listener_future.cancel()
+# Old Gmail Pub/Sub listener has been disabled in favor of Power Automate Webhook.
 
 # API Endpoints
 @app.get("/api/health")
