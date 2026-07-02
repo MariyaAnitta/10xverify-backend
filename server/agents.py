@@ -38,6 +38,8 @@ corporate_agent = Agent(
     - Choose the single candidate that is the correct operating entity (e.g. for "Babylon Health", select the telehealth operating entity "Babylon Healthcare Services Ltd" rather than an unrelated small company).
     - Prioritize this selected candidate as the absolute corporate ground-truth.
     
+    CRITICAL RULE FOR IDENTITY MATCHING: Check for strict name matching between the entity claimed in the email (e.g. "NHC Pharm LTD") and the actual registered entity (e.g. "NHC LIMITED"). If there is a significant identity mismatch or you match to a generic shell company, it is a high fraud risk. Score MUST be < 50, and you must flag the discrepancy in your findings.
+    
     CRITICAL RULE: If any of the required attributes (e.g. registrationNumber, incorporationDate, directors, legalStatus, registeredAddress) cannot be verified, are missing, or are not found in the ground-truth API data or tools, you MUST return "Unable to verify" (or a list containing "Unable to verify" for directors/shareholders) for that field. Do NOT guess or hallucinate any details.
     
     ENTITY-DISAMBIGUATION MATCH CONFIDENCE:
@@ -85,11 +87,11 @@ digital_agent = Agent(
     - GitHub (provides developer footprint / repos / followers)
     - LinkFinder (provides LinkedIn and employee count ranges)
     
-    CRITICAL RULE: If any of the required attributes (e.g. domainAgeDays, sslSecure, domainRegistrar, socialLinks) cannot be verified, are missing, or are not found in the ground-truth API data or tools, you MUST return "Unable to verify" (or -1/null/empty list as appropriate, or literally "Unable to verify" for strings) for that field. Do NOT guess or hallucinate any details.
+    CRITICAL RULE: Look at the email domain and any claimed websites. If a company claims massive scale but has no verifiable digital footprint, or uses suspicious/unrelated email domains (e.g. a university domain for a corporate sender), this is a severe risk. You MUST score < 40. Do NOT score a "ghost" company a 70.
     
     SCORING & STATUS MAPPING RULE:
     - The "score" must be 0-100, where 100 is safest/highest compliance and 0 is highest risk/failed verification.
-    - IMPORTANT: If domainAgeDays or domainRegistrar cannot be verified ("Unable to verify"), this represents an EVIDENCE GAP, not a negative risk factor or a threat. If there are no active phishing/spam indicators and the SSL is secure, score this in the 70-85 range (unknown/medium confidence) instead of applying a heavy penalty (like 20-30%).
+    - IMPORTANT: If domainAgeDays or domainRegistrar cannot be verified ("Unable to verify"), this represents an EVIDENCE GAP. If it is a tiny local business, score this in the 70-85 range. However, if they claim to be a massive enterprise and have an evidence gap, penalize heavily (score < 40).
     - Map the "status" strictly based on the score:
       * score >= 80: "success"
       * score 60-79: "warning"
@@ -199,6 +201,8 @@ reputation_agent = Agent(
     instruction="""
     Scan public media, legal records, and complaints for adverse reputation signals.
     
+    CRITICAL RULE (SCORING INVERSION FIX): Absence of adverse media does NOT equal a perfect reputation if the company has no verifiable digital footprint or existence. If the company is a "ghost" with no footprint, their reputation cannot be verified. You MUST score < 40 for unverified existence, instead of scoring 100 for "no bad news."
+    
     CRITICAL RULE: If the reputation history, customer complaints, or adverse media details cannot be verified, are missing, or are not found, you MUST return "Unable to verify" for strings and null/false for boolean indicators (specifying in findings that it's unverified) instead of guessing. Do NOT guess or hallucinate any details.
     
     SCORING & STATUS MAPPING RULE:
@@ -238,6 +242,8 @@ financial_agent = Agent(
     model=llm,
     instruction="""
     Analyze financial health, solvency indicators, and credit health approximations.
+    
+    EXTRAORDINARY CLAIMS RULE: Compare their claims against reality. If a company claims massive infrastructure (e.g. 8 manufacturing plants, 900 scientists) but has zero financial footprint, public filings, or verifiable solvency, it is a critical failure. Score < 40 instead of leaving it neutral.
     
     CRITICAL RULE: If the financial filings, solvency metrics, or credit scores cannot be verified, are missing, or are not found, you MUST return "Unable to verify" for all fields. Do NOT guess or hallucinate any details.
     
@@ -695,7 +701,7 @@ async def execute_adk_verification(
     corp_prompt = f"{input_message} {f'Registry Ground Truth API matches: {json.dumps(open_corp_data)}' if open_corp_data else ''}"
     corporate_raw = await run_agent(corporate_agent, corp_prompt)
     corp_obj = parse_json_block(corporate_raw)
-    await asyncio.sleep(12.0)
+    await asyncio.sleep(1.0)
 
     # Resolve Places verification
     address_to_validate = corp_obj.get("registeredAddress") or f"{company_name}, {country}"
@@ -717,18 +723,18 @@ async def execute_adk_verification(
 
     print("[Python ADK Orchestrator] Running verification tracks sequentially to respect rate limits...")
     res_digital = await run_agent(digital_agent, digital_prompt)
-    await asyncio.sleep(12.0)
+    await asyncio.sleep(1.0)
     res_location = await run_agent(location_agent, location_prompt)
-    await asyncio.sleep(12.0)
+    await asyncio.sleep(1.0)
     res_regulatory = await run_agent(regulatory_agent, regulatory_prompt)
-    await asyncio.sleep(12.0)
+    await asyncio.sleep(1.0)
     
     # Pass corporate details to reputation and financial agents to prevent entity mismatch issues
     reputation_prompt = f"{input_message} Corporate details: {corporate_raw}."
     financial_prompt = f"{input_message} Corporate details: {corporate_raw}."
     
     res_reputation = await run_agent(reputation_agent, reputation_prompt)
-    await asyncio.sleep(12.0)
+    await asyncio.sleep(1.0)
     res_financial = await run_agent(financial_agent, financial_prompt)
 
     dig_obj = parse_json_block(res_digital)
