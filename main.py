@@ -306,16 +306,21 @@ async def screen_vendor(payload: ScreenRequest):
 @app.post("/api/power-automate/screen", response_class=HTMLResponse)
 async def power_automate_webhook(request: Request):
     try:
-        body_bytes = await request.body()
-        email_body = body_bytes.decode('utf-8')
+        print("[Power Automate Webhook] Received webhook request. Parsing body as JSON...")
+        data = await request.json()
+        email_body = data.get("body", "")
+        print(f"[Power Automate Webhook] Extracted email body (length: {len(email_body)}). Calling parse_vendor_with_llm...")
         
         # Parse the email to find the vendor
         vendor_data = await parse_vendor_with_llm(email_body, "Forwarded Email via Power Automate")
+        print(f"[Power Automate Webhook] Vendor extraction result: {vendor_data}")
         
         if not vendor_data or not vendor_data.get('companyName'):
+            print("[Power Automate Webhook] Error: Could not extract companyName from email.")
             return HTMLResponse("<html><body><h1>Error</h1><p>Could not extract vendor details from the email.</p></body></html>", status_code=400)
             
         # Run ADK verification
+        print(f"[Power Automate Webhook] Executing ADK verification for: {vendor_data['companyName']}")
         result = await execute_adk_verification(
             company_name=vendor_data['companyName'],
             website=vendor_data['website'],
