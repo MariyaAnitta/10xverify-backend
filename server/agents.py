@@ -688,6 +688,7 @@ async def execute_adk_verification(
             return None
         github_task = no_op_github()
 
+    print("[Python ADK Orchestrator] Starting external API queries in parallel...")
     registry_data, link_finder_data, whois_data, github_data, opensanctions_data = await asyncio.gather(
         registry_task,
         query_linkfinder(website),
@@ -695,12 +696,14 @@ async def execute_adk_verification(
         github_task,
         query_opensanctions(company_name)
     )
+    print("[Python ADK Orchestrator] External API queries completed. Starting Corporate Agent...")
     open_corp_data = registry_data
 
     # 2. Run Corporate Agent first
     corp_prompt = f"{input_message} {f'Registry Ground Truth API matches: {json.dumps(open_corp_data)}' if open_corp_data else ''}"
     corporate_raw = await run_agent(corporate_agent, corp_prompt)
     corp_obj = parse_json_block(corporate_raw)
+    print("[Python ADK Orchestrator] Corporate Agent completed. Running Places verification...")
     await asyncio.sleep(1.0)
 
     # Resolve Places verification
@@ -721,11 +724,13 @@ async def execute_adk_verification(
         f"OpenSanctions API Ground Truth Matches: {json.dumps(opensanctions_data) if opensanctions_data else 'None'}"
     )
 
-    print("[Python ADK Orchestrator] Running verification tracks sequentially to respect rate limits...")
+    print("[Python ADK Orchestrator] Running Digital Agent...")
     res_digital = await run_agent(digital_agent, digital_prompt)
     await asyncio.sleep(1.0)
+    print("[Python ADK Orchestrator] Running Location Agent...")
     res_location = await run_agent(location_agent, location_prompt)
     await asyncio.sleep(1.0)
+    print("[Python ADK Orchestrator] Running Regulatory Agent...")
     res_regulatory = await run_agent(regulatory_agent, regulatory_prompt)
     await asyncio.sleep(1.0)
     
@@ -733,8 +738,10 @@ async def execute_adk_verification(
     reputation_prompt = f"{input_message} Corporate details: {corporate_raw}."
     financial_prompt = f"{input_message} Corporate details: {corporate_raw}."
     
+    print("[Python ADK Orchestrator] Running Reputation Agent...")
     res_reputation = await run_agent(reputation_agent, reputation_prompt)
     await asyncio.sleep(1.0)
+    print("[Python ADK Orchestrator] Running Financial Agent...")
     res_financial = await run_agent(financial_agent, financial_prompt)
 
     dig_obj = parse_json_block(res_digital)
@@ -742,7 +749,7 @@ async def execute_adk_verification(
     reg_obj = parse_json_block(res_regulatory)
     rep_obj = parse_json_block(res_reputation)
     fin_obj = parse_json_block(res_financial)
-    print("[Python ADK Orchestrator] Sequential tracks completed.")
+    print("[Python ADK Orchestrator] All Agent tracks completed.")
 
     # Apply post-processing floor to digital agent score
     if dig_obj.get("sslSecure") and dig_obj.get("score", 100) < 65:
