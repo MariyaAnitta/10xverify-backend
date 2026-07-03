@@ -264,7 +264,8 @@ financial_agent = Agent(
       "creditScoreEst": "string",
       "findings": "string"
     }
-    """
+    """,
+    tools=[google_search]
 )
 
 risk_intelligence_agent = Agent(
