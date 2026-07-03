@@ -71,7 +71,8 @@ corporate_agent = Agent(
       "registeredAddress": "string",
       "findings": "string"
     }
-    """
+    """,
+    tools=[google_search]
 )
 
 digital_agent = Agent(
@@ -228,7 +229,8 @@ reputation_agent = Agent(
       "adverseMediaFound": boolean | null,
       "findings": "string"
     }
-    """
+    """,
+    tools=[google_search]
 )
 
 financial_agent = Agent(

@@ -178,7 +178,11 @@ def generate_dossier_html(dossier: dict) -> str:
     
     for agent_key, agent in agent_results.items():
         score = agent.get("score", 0)
-        score_color = "#10B981" if score >= 80 else "#F59E0B" if score >= 60 else "#EF4444"
+        try:
+            score_num = int(score)
+        except (ValueError, TypeError):
+            score_num = 0
+        score_color = "#10B981" if score_num >= 80 else "#F59E0B" if score_num >= 60 else "#EF4444"
         
         html += f"""
         <div class="agent-box">
