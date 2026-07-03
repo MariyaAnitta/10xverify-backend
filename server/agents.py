@@ -110,7 +110,8 @@ digital_agent = Agent(
       "socialLinks": ["string"],
       "findings": "string"
     }
-    """
+    """,
+    tools=[google_search]
 )
 
 location_agent = Agent(
@@ -147,7 +148,8 @@ location_agent = Agent(
       "officeType": "string",
       "findings": "string"
     }
-    """
+    """,
+    tools=[google_search]
 )
 
 regulatory_agent = Agent(
@@ -188,7 +190,8 @@ regulatory_agent = Agent(
       "sanctionsRisk": "None" | "Medium" | "High" | "Unable to verify",
       "findings": "string"
     }
-    """
+    """,
+    tools=[google_search]
 )
 
 reputation_agent = Agent(
