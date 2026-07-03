@@ -966,7 +966,16 @@ async def execute_adk_verification(
     }
 
     import hashlib
-    stable_hash = int(hashlib.md5(company_name.lower().strip().encode('utf-8')).hexdigest(), 16) % 10000
+    import re
+    # Normalize company name (remove brackets, suffixes, and non-alphanumeric characters)
+    n = company_name.lower()
+    n = re.sub(r'\(.*?\)', '', n)
+    n = re.sub(r'[^a-z0-9\s]', '', n)
+    suffixes = [r'\bltd\b', r'\blimited\b', r'\bpvt\b', r'\bprivate\b', r'\bco\b', r'\bcompany\b']
+    for s in suffixes:
+        n = re.sub(s, '', n)
+    norm_name = " ".join(n.split())
+    stable_hash = int(hashlib.md5(norm_name.encode('utf-8')).hexdigest(), 16) % 10000
     
     return {
         "id": f"vnd-{stable_hash}",
