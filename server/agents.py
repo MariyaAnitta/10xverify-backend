@@ -32,6 +32,7 @@ corporate_agent = Agent(
     instruction="""
     Analyze registration records for the company.
     Find registration number, incorporation date, legal status, directors.
+    Also find the official corporate website of the target company and return it in the "website" field.
     
     If ground-truth API metadata containing a list of match candidates is provided in the query:
     - Compare the candidate names, addresses, and descriptions against the target company name, website, and industry.
@@ -69,6 +70,7 @@ corporate_agent = Agent(
       "directors": ["string"],
       "shareholders": ["string"],
       "registeredAddress": "string",
+      "website": "string",
       "findings": "string"
     }
     """,
@@ -86,6 +88,11 @@ digital_agent = Agent(
     - WhoisJSON (provides registrar, createdDate to calculate domainAgeDays, nameservers, and sslSecure status)
     - GitHub (provides developer footprint / repos / followers)
     - LinkFinder (provides LinkedIn and employee count ranges)
+    
+    CRITICAL DOMAIN MISMATCH CHECK (LOOKALIKES): 
+    - Read the Corporate details provided in the prompt (which contains the verified website of the company from public records, e.g. sitegensolar.com).
+    - Compare it with the input website/domain that the email sender used (e.g. sitegensolarassociates.com).
+    - If the sender's domain is different, or looks like a lookalike domain of the real company, this is a major security risk (impersonation/phishing). You MUST penalize the score immediately to < 20 (status "critical") and explicitly write in the findings: "POTENTIAL IMPOSTER: Domain mismatch detected between email sender and official corporate website."
     
     CRITICAL RULE: Look at the email domain and any claimed websites. If a company claims massive scale but has no verifiable digital footprint, or uses suspicious/unrelated email domains (e.g. a university domain for a corporate sender), this is a severe risk. You MUST score < 40. Do NOT score a "ghost" company a 70.
     
@@ -832,6 +839,68 @@ async def execute_adk_verification(
         except (TypeError, ValueError):
             return 0
 
+    def clean_val(val, fallback="Unable to verify"):
+        if val is None:
+            return fallback
+        s = str(val).strip().lower()
+        if s in ["", "none", "null", "undefined", "unable to verify", "capital city", "1 corporate square, capital city", "jane doe", "john smith", "domain solutions group"]:
+            return fallback
+        return val
+
+    def clean_list(val, fallback=None):
+        if fallback is None:
+            fallback = ["Unable to verify"]
+        if not val or not isinstance(val, list):
+            return fallback
+        cleaned = []
+        for v in val:
+            if v and str(v).strip().lower() not in ["", "none", "null", "undefined", "unable to verify", "jane doe", "john smith", "direct founders / corporate stock"]:
+                cleaned.append(v)
+        return cleaned if cleaned else fallback
+
+    # Apply strict validation checks and adjust scores/findings in place
+    reg_num = clean_val(corp_obj.get("registrationNumber"))
+    if reg_num == "Unable to verify" or not corp_obj.get("registrationNumber"):
+        corp_obj["score"] = min(safe_score(corp_obj.get("score")), 45)
+        corp_obj["status"] = "critical"
+        corp_obj["findings"] = "Corporate registration number and official details could not be verified."
+        corp_obj["registrationNumber"] = "Unable to verify"
+
+    val_addr = clean_val(places_data.get("formattedAddress") if places_data else corp_obj.get("registeredAddress") or loc_obj.get("validatedAddress"))
+    if val_addr == "Unable to verify" or "capital city" in val_addr.lower() or not loc_obj.get("validatedAddress"):
+        loc_obj["score"] = 0
+        loc_obj["status"] = "critical"
+        loc_obj["findings"] = "Office location address could not be verified in maps or registry databases."
+        loc_obj["validatedAddress"] = "Unable to verify"
+        loc_obj["locationSuitability"] = "Address not verified"
+
+    solvency = clean_val(fin_obj.get("solvencyStatus"))
+    credit = clean_val(fin_obj.get("creditScoreEst"))
+    if solvency == "Unable to verify" or credit == "Unable to verify":
+        fin_obj["score"] = min(safe_score(fin_obj.get("score")), 50)
+        fin_obj["status"] = "warning"
+        fin_obj["findings"] = "Solvency and credit rating cannot be verified due to lack of public financial filings."
+        fin_obj["solvencyStatus"] = "Unable to verify"
+        fin_obj["creditScoreEst"] = "Unable to verify"
+
+    # Mismatch check between official company website and email domain
+    official_web = clean_val(corp_obj.get("website"), fallback=None)
+    if official_web and website:
+        # Extract domains (remove https, http, www, subdomains)
+        def get_domain(url):
+            url = re.sub(r'https?://', '', url.lower())
+            url = re.sub(r'www\.', '', url)
+            return url.split('/')[0].strip()
+        
+        domain_official = get_domain(official_web)
+        domain_input = get_domain(website)
+        
+        if domain_official != domain_input and domain_official != "unable to verify":
+            # Override digital score and findings for lookalike domain mismatch
+            dig_obj["score"] = min(safe_score(dig_obj.get("score")), 20)
+            dig_obj["status"] = "critical"
+            dig_obj["findings"] = f"POTENTIAL IMPOSTER: Domain mismatch detected. Sender used '{domain_input}', but official corporate registry website is '{domain_official}'."
+
     scores = {
         "corporate": safe_score(corp_obj.get("score")),
         "regulatory": safe_score(reg_obj.get("score")),
@@ -875,29 +944,33 @@ async def execute_adk_verification(
         rating = get_rating(risk_score)
 
     final_details = {
-        "registrationNumber": corp_obj.get("registrationNumber") or f"CR-{100000 + hash(company_name) % 899999}",
-        "incorporationDate": corp_obj.get("incorporationDate") or "2018-06-15",
-        "legalStatus": corp_obj.get("legalStatus") or "Active",
-        "typeOfBusiness": corp_obj.get("typeOfBusiness") or f"{industry} Services",
-        "matchConfidence": corp_obj.get("matchConfidence") or "High",
-        "directors": corp_obj.get("directors") or ["Jane Doe", "John Smith"],
-        "shareholders": corp_obj.get("shareholders") or ["Direct Founders / Corporate Stock"],
-        "registeredAddress": corp_obj.get("registeredAddress") or "1 Corporate Square, Capital City",
-        "validatedAddress": (places_data.get("formattedAddress") if places_data else (loc_obj.get("validatedAddress") or "1 Corporate Square, Capital City")),
-        "locationSuitability": loc_obj.get("locationSuitability") or "Desk administrative facility suitability",
-        "domainAgeDays": dig_obj.get("domainAgeDays") or (whois_data.get("domainAgeDays") if whois_data else None) or 1240,
-        "domainRegistrar": dig_obj.get("domainRegistrar") or (whois_data.get("registrar") if whois_data else None) or "Domain Solutions Group",
-        "sslSecure": dig_obj.get("sslSecure") if dig_obj.get("sslSecure") is not None else (whois_data.get("sslSecure") if whois_data and whois_data.get("sslSecure") is not None else True),
+        "registrationNumber": clean_val(corp_obj.get("registrationNumber")),
+        "incorporationDate": clean_val(corp_obj.get("incorporationDate")),
+        "legalStatus": clean_val(corp_obj.get("legalStatus")),
+        "typeOfBusiness": clean_val(corp_obj.get("typeOfBusiness"), fallback=f"{industry} Services"),
+        "matchConfidence": clean_val(corp_obj.get("matchConfidence")),
+        "directors": clean_list(corp_obj.get("directors")),
+        "shareholders": clean_list(corp_obj.get("shareholders")),
+        "registeredAddress": clean_val(corp_obj.get("registeredAddress")),
+        "validatedAddress": clean_val(places_data.get("formattedAddress") if places_data else corp_obj.get("registeredAddress") or loc_obj.get("validatedAddress")),
+        "locationSuitability": clean_val(loc_obj.get("locationSuitability"), fallback="Unable to verify" if not loc_obj.get("validatedAddress") else "Desk administrative facility suitability"),
+        "domainAgeDays": dig_obj.get("domainAgeDays") or (whois_data.get("domainAgeDays") if whois_data else None),
+        "domainRegistrar": clean_val(dig_obj.get("domainRegistrar") or (whois_data.get("registrar") if whois_data else None)),
+        "sslSecure": dig_obj.get("sslSecure") if dig_obj.get("sslSecure") is not None else (whois_data.get("sslSecure") if whois_data and whois_data.get("sslSecure") is not None else False),
         "socialLinks": list(filter(None, [
-            link_finder_data["linkedInUrl"] if link_finder_data and link_finder_data.get("linkedInUrl") else f"https://linkedin.com/company/{company_name.lower().replace(' ', '-')}",
+            link_finder_data["linkedInUrl"] if link_finder_data and link_finder_data.get("linkedInUrl") else None,
             github_data["githubUrl"] if github_data and github_data.get("githubUrl") else None
         ])),
-        "complianceLicenses": reg_obj.get("complianceLicenses") or ["None Found"],
-        "sanctionsRisk": reg_obj.get("sanctionsRisk") or "None",
-        "solvencyStatus": fin_obj.get("solvencyStatus") or "Solvent",
-        "creditScoreEst": fin_obj.get("creditScoreEst") or "B+",
+        "complianceLicenses": clean_list(reg_obj.get("complianceLicenses")),
+        "sanctionsRisk": clean_val(reg_obj.get("sanctionsRisk"), fallback="None"),
+        "solvencyStatus": clean_val(fin_obj.get("solvencyStatus"), fallback="Unable to verify"),
+        "creditScoreEst": clean_val(fin_obj.get("creditScoreEst"), fallback="Unable to verify"),
         "adverseMediaFound": rep_obj.get("adverseMediaFound") if rep_obj.get("adverseMediaFound") is not None else False
     }
+
+    # Clean location suitability if validated address failed
+    if final_details["validatedAddress"] == "Unable to verify":
+        final_details["locationSuitability"] = "Address not verified"
 
     agent_results = {
         "corporate-agent": {
