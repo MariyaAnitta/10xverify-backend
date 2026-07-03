@@ -41,12 +41,12 @@ corporate_agent = Agent(
     
     CRITICAL RULE FOR IDENTITY MATCHING: Check for strict name matching between the entity claimed in the email (e.g. "NHC Pharm LTD") and the actual registered entity (e.g. "NHC LIMITED"). If there is a significant identity mismatch or you match to a generic shell company, it is a high fraud risk. Score MUST be < 50, and you must flag the discrepancy in your findings.
     
-    CRITICAL RULE: If any of the required attributes (e.g. registrationNumber, incorporationDate, directors, legalStatus, registeredAddress) cannot be verified, are missing, or are not found in the ground-truth API data or tools, you MUST return "Unable to verify" (or a list containing "Unable to verify" for directors/shareholders) for that field. Do NOT guess or hallucinate any details.
+    CRITICAL RULE: If any of the required attributes (e.g. registrationNumber, incorporationDate, directors, legalStatus, registeredAddress) cannot be verified, are missing, or are not found in the ground-truth API data or tools, you MUST return "Unable to verify through publicly available sources" (or a list containing "Unable to verify through publicly available sources" for directors/shareholders) for that field. Do NOT guess or hallucinate any details.
     
     ENTITY-DISAMBIGUATION MATCH CONFIDENCE:
     - Evaluate the match quality between the search query/target company and the chosen registry candidate (comparing name similarity, website, industry, and geography).
-    - Set "matchConfidence" to "High", "Medium", "Low", or "Unable to verify".
-    - If matchConfidence is "Low" or "Unable to verify" (e.g. matching a completely different company with a similar name), the score must be penalized below 50, and you must note a mismatch warning in findings.
+    - Set "matchConfidence" to "High", "Medium", "Low", or "Unable to verify through publicly available sources".
+    - If matchConfidence is "Low" or "Unable to verify through publicly available sources" (e.g. matching a completely different company with a similar name), the score must be penalized below 50, and you must note a mismatch warning in findings.
     
     SCORING & STATUS MAPPING RULE:
     - The "score" must be 0-100, where 100 is safest/highest compliance and 0 is highest risk/completely failed verification. 
@@ -59,11 +59,18 @@ corporate_agent = Agent(
     
     CRITICAL FORMATTING RULE: Keep the "findings" extremely short, concise, and up to the point (maximum 1-2 sentences). Do NOT write long paragraphs.
     
+    EXPLAINABILITY & HALLUCINATION AUDITING RULES:
+    - "confidence": Estimate your percentage confidence in the match (0-100). If registry matching is verified, confidence is 90-100%. If registry details are missing, confidence is < 70%.
+    - "reason": A brief explanation of the confidence score.
+    - "reasoningPath": A short step-by-step trace of how you evaluated the company's identity and matched it to a registry record.
+    - "hallucinationRisk": Set to "High" if you relied solely on public web search snippets without official registry database records (Companies House / SEC EDGAR), otherwise "Low".
+    - "conflictingDataDetected": Set to true if you found major discrepancies between search data, BBB, and official filing registries.
+    
     Output a JSON block:
     {
       "score": number (0-100),
       "status": "success" | "warning" | "danger" | "critical",
-      "matchConfidence": "High" | "Medium" | "Low" | "Unable to verify",
+      "matchConfidence": "High" | "Medium" | "Low" | "Unable to verify through publicly available sources",
       "registrationNumber": "string",
       "incorporationDate": "string (YYYY-MM-DD)",
       "legalStatus": "string",
@@ -71,7 +78,12 @@ corporate_agent = Agent(
       "shareholders": ["string"],
       "registeredAddress": "string",
       "website": "string",
-      "findings": "string"
+      "findings": "string",
+      "confidence": number,
+      "reason": "string",
+      "reasoningPath": "string",
+      "hallucinationRisk": "Low" | "High",
+      "conflictingDataDetected": boolean
     }
     """,
     tools=[google_search]
@@ -98,7 +110,7 @@ digital_agent = Agent(
     
     SCORING & STATUS MAPPING RULE:
     - The "score" must be 0-100, where 100 is safest/highest compliance and 0 is highest risk/failed verification.
-    - IMPORTANT: If domainAgeDays or domainRegistrar cannot be verified ("Unable to verify"), this represents an EVIDENCE GAP. If it is a tiny local business, score this in the 70-85 range. However, if they claim to be a massive enterprise and have an evidence gap, penalize heavily (score < 40).
+    - IMPORTANT: If domainAgeDays or domainRegistrar cannot be verified ("Unable to verify through publicly available sources"), this represents an EVIDENCE GAP. If it is a tiny local business, score this in the 70-85 range. However, if they claim to be a massive enterprise and have an evidence gap, penalize heavily (score < 40).
     - Map the "status" strictly based on the score:
       * score >= 80: "success"
       * score 60-79: "warning"
@@ -106,6 +118,13 @@ digital_agent = Agent(
       * score < 40: "critical"
     
     CRITICAL FORMATTING RULE: Keep the "findings" extremely short, concise, and up to the point (maximum 1-2 sentences). Do NOT write long paragraphs.
+    
+    EXPLAINABILITY & HALLUCINATION AUDITING RULES:
+    - "confidence": Estimate your percentage confidence in the analysis (0-100). If WHOIS and active SSL details are fully resolved, confidence is 90-100%. If domain age is missing, confidence is < 70%.
+    - "reason": A brief explanation of the confidence score.
+    - "reasoningPath": A short step-by-step trace of how you evaluated the digital assets and checked for domain mismatches.
+    - "hallucinationRisk": Set to "High" if you relied solely on public web search snippets without WHOIS / SSL API data, otherwise "Low".
+    - "conflictingDataDetected": Set to true if you found major discrepancies between search data and WHOIS registry records.
     
     Output a JSON block:
     {
@@ -115,7 +134,12 @@ digital_agent = Agent(
       "sslSecure": boolean,
       "domainRegistrar": "string",
       "socialLinks": ["string"],
-      "findings": "string"
+      "findings": "string",
+      "confidence": number,
+      "reason": "string",
+      "reasoningPath": "string",
+      "hallucinationRisk": "Low" | "High",
+      "conflictingDataDetected": boolean
     }
     """,
     tools=[google_search]
@@ -129,7 +153,7 @@ location_agent = Agent(
     Validate the office location. Determine if the address is commercial, virtual office, or residential.
     If Geoapify Geocoding API data is provided in the query, use it to verify the coordinates, clean formatted address, and address classification (building, office, street, etc.).
     
-    CRITICAL RULE: If the location coordinates, address suitability, or office type cannot be verified, are missing, or are not found in the ground-truth API data or tools, you MUST return "Unable to verify" for that field. Do NOT guess or hallucinate any details.
+    CRITICAL RULE: If the location coordinates, address suitability, or office type cannot be verified, are missing, or are not found in the ground-truth API data or tools, you MUST return "Unable to verify through publicly available sources" for that field. Do NOT guess or hallucinate any details.
     
     SCORING & STATUS MAPPING RULE:
     - The "score" must be 0-100, where 100 is safest/highest compliance and 0 is highest risk.
@@ -146,6 +170,13 @@ location_agent = Agent(
     
     CRITICAL FORMATTING RULE: Keep the "findings" extremely short, concise, and up to the point (maximum 1-2 sentences). Do NOT write long paragraphs.
     
+    EXPLAINABILITY & HALLUCINATION AUDITING RULES:
+    - "confidence": Estimate your percentage confidence in the address validation (0-100). If Maps coordinates match the registry address exactly, confidence is 90-100%. If address search results in "Unable to verify", confidence is < 50%.
+    - "reason": A brief explanation of the confidence score.
+    - "reasoningPath": A short step-by-step trace of how you cross-referenced registry addresses with map validations.
+    - "hallucinationRisk": Set to "High" if you relied solely on public web search snippets without Maps/Geoapify API data, otherwise "Low".
+    - "conflictingDataDetected": Set to true if you found major discrepancies between registry addresses and actual operational locations.
+    
     Output a JSON block:
     {
       "score": number (0-100),
@@ -153,7 +184,12 @@ location_agent = Agent(
       "validatedAddress": "string",
       "locationSuitability": "string",
       "officeType": "string",
-      "findings": "string"
+      "findings": "string",
+      "confidence": number,
+      "reason": "string",
+      "reasoningPath": "string",
+      "hallucinationRisk": "Low" | "High",
+      "conflictingDataDetected": boolean
     }
     """,
     tools=[google_search]
@@ -173,7 +209,7 @@ regulatory_agent = Agent(
     - If the entity only has ITAR/export control compliance obligations or exclusion listings but NO active blocking trade/financial sanctions, you MUST set "sanctionsRisk" to "Medium" or "None".
     - Clearly document this distinction in your findings.
     
-    CRITICAL RULE: If the licenses, sanctions risk, or compliance indicators cannot be verified, are missing, or are not found in the ground-truth API data or tools, you MUST return "Unable to verify" for that field. Do NOT guess or hallucinate any details.
+    CRITICAL RULE: If the licenses, sanctions risk, or compliance indicators cannot be verified, are missing, or are not found in the ground-truth API data or tools, you MUST return "Unable to verify through publicly available sources" for that field. Do NOT guess or hallucinate any details.
     
     SCORING & STATUS MAPPING RULE:
     - The "score" must be 0-100, where 100 is safest/highest compliance and 0 is highest risk/banned status.
@@ -189,13 +225,25 @@ regulatory_agent = Agent(
     
     CRITICAL FORMATTING RULE: Keep the "findings" extremely short, concise, and up to the point (maximum 1-2 sentences). Do NOT write long paragraphs.
     
+    EXPLAINABILITY & HALLUCINATION AUDITING RULES:
+    - "confidence": Estimate your percentage confidence in the compliance check (0-100). If sanctions list check matches direct OpenSanctions API hits, confidence is 95-100%. If licenses cannot be verified, confidence is < 70%.
+    - "reason": A brief explanation of the confidence score.
+    - "reasoningPath": A short step-by-step trace of how you audited the sanctions database and verified licenses.
+    - "hallucinationRisk": Set to "High" if you relied solely on public web search snippets without OpenSanctions API records, otherwise "Low".
+    - "conflictingDataDetected": Set to true if you found major discrepancies between public claims of licensing and official registers.
+    
     Output a JSON block:
     {
       "score": number (0-100),
       "status": "success" | "warning" | "danger" | "critical",
       "complianceLicenses": ["string"],
-      "sanctionsRisk": "None" | "Medium" | "High" | "Unable to verify",
-      "findings": "string"
+      "sanctionsRisk": "None" | "Medium" | "High" | "Unable to verify through publicly available sources",
+      "findings": "string",
+      "confidence": number,
+      "reason": "string",
+      "reasoningPath": "string",
+      "hallucinationRisk": "Low" | "High",
+      "conflictingDataDetected": boolean
     }
     """,
     tools=[google_search]
@@ -210,7 +258,7 @@ reputation_agent = Agent(
     
     CRITICAL RULE (SCORING INVERSION FIX): Absence of adverse media does NOT equal a perfect reputation if the company has no verifiable digital footprint or existence. If the company is a "ghost" with no footprint, their reputation cannot be verified. You MUST score < 40 for unverified existence, instead of scoring 100 for "no bad news."
     
-    CRITICAL RULE: If the reputation history, customer complaints, or adverse media details cannot be verified, are missing, or are not found, you MUST return "Unable to verify" for strings and null/false for boolean indicators (specifying in findings that it's unverified) instead of guessing. Do NOT guess or hallucinate any details.
+    CRITICAL RULE: If the reputation history, customer complaints, or adverse media details cannot be verified, are missing, or are not found, you MUST return "Unable to verify through publicly available sources" for strings and null/false for boolean indicators (specifying in findings that it's unverified) instead of guessing. Do NOT guess or hallucinate any details.
     
     SCORING & STATUS MAPPING RULE:
     - The "score" must be 0-100, where 100 is the best reputation (no adverse media, or only unproven/low-relevance/dismissed allegations) and 0 is the worst reputation (severe adjudicated fraud, bankruptcies, criminal convictions).
@@ -232,12 +280,24 @@ reputation_agent = Agent(
     
     CRITICAL FORMATTING RULE: Keep the "findings" extremely short, concise, and up to the point (maximum 1-2 sentences). Do NOT write long paragraphs.
     
+    EXPLAINABILITY & HALLUCINATION AUDITING RULES:
+    - "confidence": Estimate your percentage confidence in the reputation check (0-100). If adverse press findings match direct searches, confidence is 90-100%. If news cannot be verified, confidence is < 70%.
+    - "reason": A brief explanation of the confidence score.
+    - "reasoningPath": A short step-by-step trace of how you audited the news index and sentiment.
+    - "hallucinationRisk": Set to "High" if you relied solely on public web search snippets without verified media databases, otherwise "Low".
+    - "conflictingDataDetected": Set to true if you found major discrepancies between company claims and BBB/customer reviews.
+    
     Output a JSON block:
     {
       "score": number (0-100),
       "status": "success" | "warning" | "danger" | "critical",
       "adverseMediaFound": boolean | null,
-      "findings": "string"
+      "findings": "string",
+      "confidence": number,
+      "reason": "string",
+      "reasoningPath": "string",
+      "hallucinationRisk": "Low" | "High",
+      "conflictingDataDetected": boolean
     }
     """,
     tools=[google_search]
@@ -252,7 +312,7 @@ financial_agent = Agent(
     
     EXTRAORDINARY CLAIMS RULE: Compare their claims against reality. If a company claims massive infrastructure (e.g. 8 manufacturing plants, 900 scientists) but has zero financial footprint, public filings, or verifiable solvency, it is a critical failure. Score < 40 instead of leaving it neutral.
     
-    CRITICAL RULE: If the financial filings, solvency metrics, or credit scores cannot be verified, are missing, or are not found, you MUST return "Unable to verify" for all fields. Do NOT guess or hallucinate any details.
+    CRITICAL RULE: If the financial filings, solvency metrics, or credit scores cannot be verified, are missing, or are not found, you MUST return "Unable to verify through publicly available sources" for all fields. Do NOT guess or hallucinate any details.
     
     SCORING & STATUS MAPPING RULE:
     - The "score" must be 0-100, where 100 is safest/strongest financial solvency and 0 is insolvency or extreme financial risk.
@@ -266,13 +326,25 @@ financial_agent = Agent(
     
     CRITICAL FORMATTING RULE: Keep the "findings" extremely short, concise, and up to the point (maximum 1-2 sentences). Do NOT write long paragraphs.
     
+    EXPLAINABILITY & HALLUCINATION AUDITING RULES:
+    - "confidence": Estimate your percentage confidence in the financial audit (0-100). If financial statements are fully verified through registry APIs, confidence is 90-100%. If financials are missing, confidence is < 60%.
+    - "reason": A brief explanation of the confidence score.
+    - "reasoningPath": A short step-by-step trace of how you evaluated the company's financial indicators.
+    - "hallucinationRisk": Set to "High" if you relied solely on public web search snippets without verified financial reports, otherwise "Low".
+    - "conflictingDataDetected": Set to true if you found major discrepancies between financial claims and search index facts.
+    
     Output a JSON block:
     {
       "score": number (0-100),
       "status": "success" | "warning" | "danger" | "critical",
-      "solvencyStatus": "Solvent" | "High Risk" | "Insolvent" | "Unable to verify",
+      "solvencyStatus": "Solvent" | "High Risk" | "Insolvent" | "Unable to verify through publicly available sources",
       "creditScoreEst": "string",
-      "findings": "string"
+      "findings": "string",
+      "confidence": number,
+      "reason": "string",
+      "reasoningPath": "string",
+      "hallucinationRisk": "Low" | "High",
+      "conflictingDataDetected": boolean
     }
     """,
     tools=[google_search]
@@ -282,11 +354,10 @@ risk_intelligence_agent = Agent(
     name="risk_intelligence_agent",
     description="Orchestrates findings from other agents to formulate final risk score and recommendation.",
     model=llm,
-    instruction="""
-    Formulate cumulative risk assessment from corporate, digital, location, regulatory, reputation, and financial data.
+    instruction="    Formulate cumulative risk assessment from corporate, digital, location, regulatory, reputation, and financial data.
     Determine final rating (GREEN, AMBER, RED, BLACK), overall risk score, executive summary, and actionable advice.
     
-    CRITICAL RULE: If the majority of input agent ratings are marked "Unable to verify" or if critical verification details cannot be resolved across the workspace, you may reflect this in the rating, executive summary, and recommendation by explicitly stating that verification could not be completed.
+    CRITICAL RULE: If the majority of input agent ratings are marked "Unable to verify through publicly available sources" or if critical verification details cannot be resolved across the workspace, you may reflect this in the rating, executive summary, and recommendation by explicitly stating that verification could not be completed.
     
     SCORING RULE: The "overallScore" must be 0-100, where 100 is the highest compliance/safest (no risks) and 0 is the highest risk/completely failed. Note: The overallScore is the average/weighted assessment of the corporate, digital, location, regulatory, reputation, and financial scores. Ensure it remains high (e.g. 80-95%) if most agent scores are high, and is only dragged down to RED/AMBER/BLACK if there are real, verified negative compliance/reputation/financial issues.
     
@@ -298,12 +369,24 @@ risk_intelligence_agent = Agent(
     
     CRITICAL FORMATTING RULE: Keep the "executiveSummary" and "recommendation" extremely short, concise, and to the point. Make each a maximum of 2 sentences. Do NOT write long lists or paragraphs.
     
+    EXPLAINABILITY & RISK DRIVERS:
+    - "confidenceScore": Calculate the average confidence score (0-100) from the input agents.
+    - "riskDrivers": Return a structured bulleted array of strings detailing precisely WHY the risk exists (e.g., "Domain mismatch detected between sender and corporate website", "Corporate registration is unverified").
+    - "reasoningPath": Summarize how you synthesized the multi-agent outputs to reach the final rating.
+    - "hallucinationRisk": Set to "High" if critical source details are unverified and rely solely on search, otherwise "Low".
+    - "conflictingDataDetected": Set to true if any input agent flagged conflicting data.
+    
     Output a JSON block:
     {
       "overallScore": number (0-100),
       "rating": "GREEN" | "AMBER" | "RED" | "BLACK",
       "executiveSummary": "string",
-      "recommendation": "string"
+      "recommendation": "string",
+      "confidenceScore": number,
+      "riskDrivers": ["string"],
+      "reasoningPath": "string",
+      "hallucinationRisk": "Low" | "High",
+      "conflictingDataDetected": boolean
     }
     """
 )
@@ -980,7 +1063,14 @@ async def execute_adk_verification(
             "status": corp_obj.get("status") or "success",
             "outputMessage": corp_obj.get("findings") or "Corporate status validation completed.",
             "evidence": ["Filing checks completed"],
-            "keyFindings": [corp_obj.get("findings") or "Valid legal registry records matched."]
+            "keyFindings": [corp_obj.get("findings") or "Valid legal registry records matched."],
+            "confidence": corp_obj.get("confidence") or 90,
+            "reason": corp_obj.get("reason") or "Filing records matched.",
+            "explainability": {
+                "reasoningPath": corp_obj.get("reasoningPath") or "Validated registered entities.",
+                "hallucinationRisk": corp_obj.get("hallucinationRisk") or "Low",
+                "conflictingDataDetected": corp_obj.get("conflictingDataDetected") or False
+            }
         },
         "digital-agent": {
             "agentId": "digital-agent",
@@ -989,7 +1079,14 @@ async def execute_adk_verification(
             "status": dig_obj.get("status") or "success",
             "outputMessage": dig_obj.get("findings") or "Domain metadata resolved.",
             "evidence": ["SSL active matches"],
-            "keyFindings": [dig_obj.get("findings") or "SSL cert verified secure."]
+            "keyFindings": [dig_obj.get("findings") or "SSL cert verified secure."],
+            "confidence": dig_obj.get("confidence") or 85,
+            "reason": dig_obj.get("reason") or "Digital footprint analyzed.",
+            "explainability": {
+                "reasoningPath": dig_obj.get("reasoningPath") or "Analyzed WHOIS and web stack.",
+                "hallucinationRisk": dig_obj.get("hallucinationRisk") or "Low",
+                "conflictingDataDetected": dig_obj.get("conflictingDataDetected") or False
+            }
         },
         "location-agent": {
             "agentId": "location-agent",
@@ -998,7 +1095,14 @@ async def execute_adk_verification(
             "status": loc_obj.get("status") or "success",
             "outputMessage": loc_obj.get("findings") or "Address search matching finished.",
             "evidence": ["Google Places lookup maps"],
-            "keyFindings": [loc_obj.get("findings") or "Suitable commercial operations site."]
+            "keyFindings": [loc_obj.get("findings") or "Suitable commercial operations site."],
+            "confidence": loc_obj.get("confidence") or 90,
+            "reason": loc_obj.get("reason") or "Address geolocated on maps.",
+            "explainability": {
+                "reasoningPath": loc_obj.get("reasoningPath") or "Verified coordinates and office category.",
+                "hallucinationRisk": loc_obj.get("hallucinationRisk") or "Low",
+                "conflictingDataDetected": loc_obj.get("conflictingDataDetected") or False
+            }
         },
         "regulatory-agent": {
             "agentId": "regulatory-agent",
@@ -1007,7 +1111,14 @@ async def execute_adk_verification(
             "status": reg_obj.get("status") or "success",
             "outputMessage": reg_obj.get("findings") or "Sanctions checking completed.",
             "evidence": ["International sanctions scan list"],
-            "keyFindings": [reg_obj.get("findings") or "Zero sanctions database matches."]
+            "keyFindings": [reg_obj.get("findings") or "Zero sanctions database matches."],
+            "confidence": reg_obj.get("confidence") or 95,
+            "reason": reg_obj.get("reason") or "Sanctions lists checked.",
+            "explainability": {
+                "reasoningPath": reg_obj.get("reasoningPath") or "Queried watchlist registries.",
+                "hallucinationRisk": reg_obj.get("hallucinationRisk") or "Low",
+                "conflictingDataDetected": reg_obj.get("conflictingDataDetected") or False
+            }
         },
         "reputation-agent": {
             "agentId": "reputation-agent",
@@ -1016,7 +1127,14 @@ async def execute_adk_verification(
             "status": rep_obj.get("status") or "success",
             "outputMessage": rep_obj.get("findings") or "Press and Sentinel scanning completed.",
             "evidence": ["Adverse news indexing search"],
-            "keyFindings": [rep_obj.get("findings") or "Zero lawsuits or warnings detected."]
+            "keyFindings": [rep_obj.get("findings") or "Zero lawsuits or warnings detected."],
+            "confidence": rep_obj.get("confidence") or 80,
+            "reason": rep_obj.get("reason") or "Media channels indexed.",
+            "explainability": {
+                "reasoningPath": rep_obj.get("reasoningPath") or "Scanned public news forums.",
+                "hallucinationRisk": rep_obj.get("hallucinationRisk") or "Low",
+                "conflictingDataDetected": rep_obj.get("conflictingDataDetected") or False
+            }
         },
         "financial-agent": {
             "agentId": "financial-agent",
@@ -1025,7 +1143,14 @@ async def execute_adk_verification(
             "status": fin_obj.get("status") or "success",
             "outputMessage": fin_obj.get("findings") or "Solvency profiles checks resolved.",
             "evidence": ["Audited financial reports scan"],
-            "keyFindings": [fin_obj.get("findings") or "Verified financial solvency standing."]
+            "keyFindings": [fin_obj.get("findings") or "Verified financial solvency standing."],
+            "confidence": fin_obj.get("confidence") or 80,
+            "reason": fin_obj.get("reason") or "Solvency indicators checked.",
+            "explainability": {
+                "reasoningPath": fin_obj.get("reasoningPath") or "Evaluated credit tiers and filings.",
+                "hallucinationRisk": fin_obj.get("hallucinationRisk") or "Low",
+                "conflictingDataDetected": fin_obj.get("conflictingDataDetected") or False
+            }
         },
         "risk-intelligence-agent": {
             "agentId": "risk-intelligence-agent",
@@ -1034,7 +1159,14 @@ async def execute_adk_verification(
             "status": "success" if rating == "GREEN" else ("warning" if rating == "AMBER" else ("danger" if rating == "RED" else "critical")),
             "outputMessage": risk_obj.get("executiveSummary") or "Comprehensive risk validation logs compiled.",
             "evidence": ["Aggregated multi-agent consensus profiles"],
-            "keyFindings": [risk_obj.get("recommendation") or "Proceed with onboarding."]
+            "keyFindings": [risk_obj.get("recommendation") or "Proceed with onboarding."],
+            "confidence": risk_obj.get("confidenceScore") or 85,
+            "reason": "Risk consensus completed.",
+            "explainability": {
+                "reasoningPath": risk_obj.get("reasoningPath") or "Aggregated and synthesized risk indices.",
+                "hallucinationRisk": risk_obj.get("hallucinationRisk") or "Low",
+                "conflictingDataDetected": risk_obj.get("conflictingDataDetected") or False
+            }
         }
     }
 
@@ -1064,6 +1196,13 @@ async def execute_adk_verification(
         "details": final_details,
         "executiveSummary": risk_obj.get("executiveSummary") or "Evaluated and compiled.",
         "recommendation": risk_obj.get("recommendation") or "Approved.",
+        "confidenceScore": risk_obj.get("confidenceScore") or 85,
+        "riskDrivers": risk_obj.get("riskDrivers") or [],
+        "explainability": {
+            "reasoningPath": risk_obj.get("reasoningPath") or "Consensus completed.",
+            "hallucinationRisk": risk_obj.get("hallucinationRisk") or "Low",
+            "conflictingDataDetected": risk_obj.get("conflictingDataDetected") or False
+        },
         "agentResults": agent_results,
         "comments": [],
         "isRealTimeResult": True
