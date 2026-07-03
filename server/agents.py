@@ -71,7 +71,8 @@ corporate_agent = Agent(
       "registeredAddress": "string",
       "findings": "string"
     }
-    """
+    """,
+    tools=[google_search]
 )
 
 digital_agent = Agent(
@@ -109,7 +110,8 @@ digital_agent = Agent(
       "socialLinks": ["string"],
       "findings": "string"
     }
-    """
+    """,
+    tools=[google_search]
 )
 
 location_agent = Agent(
@@ -146,7 +148,8 @@ location_agent = Agent(
       "officeType": "string",
       "findings": "string"
     }
-    """
+    """,
+    tools=[google_search]
 )
 
 regulatory_agent = Agent(
@@ -187,7 +190,8 @@ regulatory_agent = Agent(
       "sanctionsRisk": "None" | "Medium" | "High" | "Unable to verify",
       "findings": "string"
     }
-    """
+    """,
+    tools=[google_search]
 )
 
 reputation_agent = Agent(
@@ -228,7 +232,8 @@ reputation_agent = Agent(
       "adverseMediaFound": boolean | null,
       "findings": "string"
     }
-    """
+    """,
+    tools=[google_search]
 )
 
 financial_agent = Agent(
@@ -262,7 +267,8 @@ financial_agent = Agent(
       "creditScoreEst": "string",
       "findings": "string"
     }
-    """
+    """,
+    tools=[google_search]
 )
 
 risk_intelligence_agent = Agent(
