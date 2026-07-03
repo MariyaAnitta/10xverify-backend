@@ -238,11 +238,11 @@ export default function ExecutiveDashboard({ vendors, metrics, onVendorSelect, o
                 <div
                   key={vendor.id}
                   onClick={() => onVendorSelect(vendor)}
-                  className={`p-4 bg-white hover:bg-slate-50/70 border border-slate-100 rounded-xl shadow-xxs transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${getRiskBorder(vendor.riskRating)}`}
+                  className={`p-4 bg-white hover:bg-slate-50/70 border border-slate-100 rounded-xl shadow-xxs transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 group ${getRiskBorder(vendor.riskRating)}`}
                 >
                   <div className="space-y-1 max-w-md">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="font-semibold text-slate-900 text-sm tracking-tight">{vendor.companyName}</h4>
+                      <h4 className="font-semibold text-slate-900 text-sm tracking-tight group-hover:text-blue-600 transition-colors">{vendor.companyName}</h4>
                       <span className="text-xxs font-bold uppercase tracking-wider text-slate-400 px-1.5 py-0.5 bg-slate-50 border border-slate-100 rounded">
                         {vendor.industry}
                       </span>
@@ -255,24 +255,26 @@ export default function ExecutiveDashboard({ vendors, metrics, onVendorSelect, o
                     <p className="text-xs text-slate-500 line-clamp-1">{vendor.executiveSummary}</p>
                   </div>
 
-                  <div className="flex items-center justify-between sm:justify-end gap-4 shrink-0 border-t sm:border-0 pt-2 sm:pt-0 border-slate-50">
-                    <div className="text-left sm:text-right">
-                      <div className="text-xxs text-slate-400 uppercase tracking-widest font-semibold">Weighted Integrity</div>
-                      <div className="text-lg font-bold text-slate-900">{vendor.riskScore}%</div>
+                  <div className="flex flex-col items-end justify-center gap-2 shrink-0 border-t md:border-0 pt-3 md:pt-0 border-slate-100">
+                    <div className="flex items-center gap-3">
+                      <div className="text-right">
+                        <div className="text-[10px] text-slate-400 uppercase tracking-widest font-semibold">Weighted Integrity</div>
+                        <div className="text-sm font-bold text-slate-900">{vendor.riskScore}%</div>
+                      </div>
+                      {getRiskBadge(vendor.riskRating)}
                     </div>
                     <div className="flex items-center gap-2">
-                      {getRiskBadge(vendor.riskRating)}
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           onDeleteVendor(vendor.id);
                         }}
-                        className="p-1.5 bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-650 rounded-lg transition-all border border-slate-100 cursor-pointer"
+                        className="p-1.5 bg-slate-50 hover:bg-red-50 text-slate-400 hover:text-red-600 rounded-lg transition-all border border-slate-100 cursor-pointer"
                         title="Delete record from system"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
-                      <div className="p-1.5 bg-slate-50 group-hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded-lg transition-all">
+                      <div className="p-1.5 bg-slate-50 group-hover:bg-blue-50 text-slate-400 group-hover:text-blue-600 rounded-lg transition-all border border-slate-100">
                         <ArrowUpRight className="w-4 h-4" />
                       </div>
                     </div>
