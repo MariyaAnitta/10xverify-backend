@@ -959,8 +959,11 @@ async def execute_adk_verification(
         }
     }
 
+    import hashlib
+    stable_hash = int(hashlib.md5(company_name.lower().strip().encode('utf-8')).hexdigest(), 16) % 10000
+    
     return {
-        "id": f"vnd-{hash(company_name) % 10000}",
+        "id": f"vnd-{stable_hash}",
         "companyName": company_name,
         "website": website,
         "country": country,
