@@ -50,18 +50,19 @@ def generate_dossier_html(dossier: dict) -> str:
                 margin-bottom: 30px;
             }}
             .section-title {{
-                font-size: 18px;
+                font-size: 14px;
                 font-weight: bold;
                 text-transform: uppercase;
-                border-bottom: 1px solid #D1D5DB;
+                border-bottom: 1.5px solid #111827;
                 padding-bottom: 5px;
                 margin-bottom: 15px;
-                letter-spacing: 1px;
+                letter-spacing: 0.5px;
+                color: #111827;
             }}
             .grid {{
                 display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 20px;
+                grid-template-columns: 1fr 1fr 1fr;
+                gap: 15px;
             }}
             .card {{
                 background: #F9FAFB;
@@ -70,17 +71,29 @@ def generate_dossier_html(dossier: dict) -> str:
                 padding: 15px;
             }}
             .kv-pair {{
-                margin-bottom: 8px;
+                margin-bottom: 10px;
+                display: flex;
+                justify-content: space-between;
+                align-items: baseline;
+                border-bottom: 1px dashed #E5E7EB;
+                padding-bottom: 4px;
+            }}
+            .kv-pair:last-child {{
+                border-bottom: none;
             }}
             .kv-label {{
-                font-size: 12px;
+                font-size: 9px;
                 font-weight: bold;
                 color: #6B7280;
                 text-transform: uppercase;
             }}
             .kv-value {{
-                font-size: 14px;
-                font-weight: 500;
+                font-size: 11px;
+                font-weight: 600;
+                color: #111827;
+                text-align: right;
+                max-width: 60%;
+                word-wrap: break-word;
             }}
             .agent-box {{
                 border: 1px solid #E5E7EB;
@@ -119,26 +132,43 @@ def generate_dossier_html(dossier: dict) -> str:
         
         <div class="section">
             <div class="section-title">Executive Risk Summary</div>
-            <p style="font-weight: 500;">{dossier.get('executiveSummary')}</p>
-            <div style="background: #FEF2F2; padding: 15px; border-left: 4px solid #EF4444; margin-top: 15px;">
-                <strong>Primary Directive:</strong><br>
-                {dossier.get('recommendation')}
+            <p style="font-weight: 500; font-size: 13px; line-height: 1.5; margin: 0 0 12px 0;">{dossier.get('executiveSummary')}</p>
+            <div style="background: #FEF2F2; padding: 12px; border-left: 4px solid #EF4444; border-radius: 4px;">
+                <strong style="font-size: 12px; color: #991B1B;">Primary Directive:</strong><br>
+                <span style="font-size: 12px; color: #7F1D1D; font-weight: 550;">{dossier.get('recommendation')}</span>
             </div>
         </div>
         
         <div class="grid section">
+            <!-- Box 1: Legal Incorporations -->
             <div class="card">
-                <div class="section-title" style="border: none;">Corporate & Legal</div>
-                <div class="kv-pair"><div class="kv-label">Registration Number</div><div class="kv-value">{details.get('registrationNumber')}</div></div>
+                <div class="section-title">Legal Incorporations</div>
+                <div class="kv-pair"><div class="kv-label">Reg Number</div><div class="kv-value">{details.get('registrationNumber')}</div></div>
                 <div class="kv-pair"><div class="kv-label">Incorporated</div><div class="kv-value">{details.get('incorporationDate')}</div></div>
                 <div class="kv-pair"><div class="kv-label">Legal Status</div><div class="kv-value">{details.get('legalStatus')}</div></div>
+                <div class="kv-pair"><div class="kv-label">Industry Type</div><div class="kv-value">{details.get('typeOfBusiness') or dossier.get('industry')}</div></div>
+                <div class="kv-pair"><div class="kv-label">Directors</div><div class="kv-value" style="font-size: 10px;">{", ".join(details.get('directors', [])) if isinstance(details.get('directors'), list) else details.get('directors')}</div></div>
+                <div class="kv-pair"><div class="kv-label">Shareholders & UBOS</div><div class="kv-value" style="font-size: 10px;">{", ".join(details.get('shareholders', [])) if isinstance(details.get('shareholders'), list) else details.get('shareholders')}</div></div>
             </div>
             
+            <!-- Box 2: Physical & Digital Audit -->
             <div class="card">
-                <div class="section-title" style="border: none;">Compliance & Risk</div>
-                <div class="kv-pair"><div class="kv-label">Sanctions / SDN Status</div><div class="kv-value">{details.get('sanctionsRisk')}</div></div>
-                <div class="kv-pair"><div class="kv-label">Financial Solvency</div><div class="kv-value">{details.get('solvencyStatus')}</div></div>
-                <div class="kv-pair"><div class="kv-label">Adverse Press</div><div class="kv-value">{'Yes' if details.get('adverseMediaFound') else 'No'}</div></div>
+                <div class="section-title">Physical & Digital Audit</div>
+                <div class="kv-pair"><div class="kv-label">Registered Office</div><div class="kv-value" style="font-size: 10px;">{details.get('registeredAddress')}</div></div>
+                <div class="kv-pair"><div class="kv-label">Map Validation</div><div class="kv-value" style="font-size: 10px;">{details.get('validatedAddress')}</div></div>
+                <div class="kv-pair"><div class="kv-label">Domain Age</div><div class="kv-value">{f"{details.get('domainAgeDays')} Days (~{details.get('domainAgeDays') // 365} years)" if isinstance(details.get('domainAgeDays'), int) else details.get('domainAgeDays')}</div></div>
+                <div class="kv-pair"><div class="kv-label">Domain Registrar</div><div class="kv-value">{details.get('domainRegistrar')}</div></div>
+                <div class="kv-pair"><div class="kv-label">SSL Security</div><div class="kv-value" style="color: {'#10B981' if details.get('sslSecure') else '#EF4444'};">{'SECURE (SSL)' if details.get('sslSecure') else 'UNENCRYPTED'}</div></div>
+            </div>
+
+            <!-- Box 3: Compliance Checklists -->
+            <div class="card">
+                <div class="section-title">Compliance Checklists</div>
+                <div class="kv-pair"><div class="kv-label">Solvency Index</div><div class="kv-value" style="color: {'#10B981' if details.get('solvencyStatus') == 'Solvent' else '#EF4444'};">{details.get('solvencyStatus')}</div></div>
+                <div class="kv-pair"><div class="kv-label">Credit Tier Est</div><div class="kv-value">{details.get('creditScoreEst')}</div></div>
+                <div class="kv-pair"><div class="kv-label">Sanctions SDN Status</div><div class="kv-value" style="color: {'#10B981' if details.get('sanctionsRisk') == 'None' else '#EF4444'};">{details.get('sanctionsRisk')}</div></div>
+                <div class="kv-pair"><div class="kv-label">Adverse Press Found</div><div class="kv-value" style="color: {'#EF4444' if details.get('adverseMediaFound') else '#10B981'};">{'FOUND' if details.get('adverseMediaFound') else 'NONE'}</div></div>
+                <div class="kv-pair"><div class="kv-label">Licenses Audited</div><div class="kv-value" style="font-size: 10px;">{", ".join(details.get('complianceLicenses', [])) if isinstance(details.get('complianceLicenses'), list) else details.get('complianceLicenses')}</div></div>
             </div>
         </div>
         
