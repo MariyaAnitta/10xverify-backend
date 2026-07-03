@@ -310,6 +310,34 @@ async def power_automate_webhook(request: Request):
             
         # Run ADK verification
         print(f"[Power Automate Webhook] Executing ADK verification for: {vendor_data['companyName']}")
+        
+        # 1. Compute stable MD5 ID to check for recent duplicate requests (retries)
+        import hashlib
+        from datetime import datetime, timezone
+        c_name = vendor_data['companyName']
+        stable_hash = int(hashlib.md5(c_name.lower().strip().encode('utf-8')).hexdigest(), 16) % 10000
+        vendor_id = f"vnd-{stable_hash}"
+        
+        doc_ref = db_fs.collection("vendors").document(vendor_id)
+        doc = doc_ref.get()
+        if doc.exists:
+            existing_data = doc.to_dict()
+            screened_at_str = existing_data.get("screenedAt")
+            if screened_at_str:
+                try:
+                    # Clean Z and parse ISO timestamp
+                    clean_date_str = screened_at_str.replace("Z", "")
+                    dt = datetime.fromisoformat(clean_date_str).replace(tzinfo=timezone.utc)
+                    age_seconds = (datetime.now(timezone.utc) - dt).total_seconds()
+                    
+                    # If verified in the last 10 minutes, return cached HTML report instantly
+                    if age_seconds < 600:
+                        print(f"[Power Automate Webhook] Vendor {vendor_id} was recently verified {age_seconds:.1f} seconds ago. Returning cached report.")
+                        html_report = generate_dossier_html(existing_data)
+                        return html_report
+                except Exception as ex:
+                    print(f"[Power Automate Webhook] Failed to check cached report age: {ex}")
+        
         result = await execute_adk_verification(
             company_name=vendor_data['companyName'],
             website=vendor_data['website'],
