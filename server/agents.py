@@ -973,9 +973,9 @@ async def execute_adk_verification(
         "registeredAddress": clean_val(corp_obj.get("registeredAddress")),
         "validatedAddress": clean_val(places_data.get("formattedAddress") if places_data else corp_obj.get("registeredAddress") or loc_obj.get("validatedAddress")),
         "locationSuitability": clean_val(loc_obj.get("locationSuitability"), fallback="Unable to verify" if not loc_obj.get("validatedAddress") else "Desk administrative facility suitability"),
-        "domainAgeDays": dig_obj.get("domainAgeDays") or (whois_data.get("domainAgeDays") if whois_data else None),
-        "domainRegistrar": clean_val(dig_obj.get("domainRegistrar") or (whois_data.get("registrar") if whois_data else None)),
-        "sslSecure": dig_obj.get("sslSecure") if dig_obj.get("sslSecure") is not None else (whois_data.get("sslSecure") if whois_data and whois_data.get("sslSecure") is not None else False),
+        "domainAgeDays": whois_data.get("domainAgeDays") if whois_data else None,
+        "domainRegistrar": clean_val(whois_data.get("registrar") if whois_data else None),
+        "sslSecure": whois_data.get("sslSecure") if whois_data and whois_data.get("sslSecure") is not None else False,
         "socialLinks": list(filter(None, [
             link_finder_data["linkedInUrl"] if link_finder_data and link_finder_data.get("linkedInUrl") else None,
             github_data["githubUrl"] if github_data and github_data.get("githubUrl") else None
