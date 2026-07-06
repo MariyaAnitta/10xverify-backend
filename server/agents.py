@@ -449,6 +449,172 @@ async def query_linkfinder(website: str):
         print(f"[LinkFinder API] Error: {e}")
     return None
 
+
+async def query_orb_intelligence(company_name: str):
+    print(f"[ORB Intelligence API] Skipping query for {company_name} because API is currently down.")
+    return None
+    api_key = os.getenv("ORB_API_KEY")
+    if not api_key or api_key == "your_key_here" or api_key.strip() == "":
+        return None
+    try:
+        url = "https://api.orb-intelligence.com/3/search/"
+        headers = {"Authorization": f"Token {api_key}"}
+        async with httpx.AsyncClient() as client:
+            res = await client.get(url, params={"name": company_name, "limit": 5}, headers=headers, timeout=8.0)
+            if res.status_code == 200:
+                results = res.json().get("results", [])
+                candidates = []
+                for match in results:
+                    candidates.append({
+                        "companyName": match.get("name"),
+                        "registrationNumber": match.get("orb_num"),
+                        "legalStatus": match.get("entity_status"),
+                        "registeredAddress": match.get("address", {}).get("full_address"),
+                        "website": match.get("domain"),
+                        "industry": match.get("industry", {}).get("name")
+                    })
+                return candidates if candidates else None
+    except Exception as e:
+        print(f"[ORB Intelligence API] Error: {e}")
+    return None
+
+async def query_ip2whois(website: str):
+    api_key = os.getenv("IP2WHOIS_API_KEY")
+    if not api_key or api_key == "your_key_here" or api_key.strip() == "":
+        return None
+    try:
+        url = "https://api.ip2whois.com/v2"
+        params = {"key": api_key, "domain": website}
+        async with httpx.AsyncClient() as client:
+            res = await client.get(url, params=params, timeout=12.0)
+            if res.status_code == 200:
+                data = res.json()
+                if "error" not in data:
+                    created_date = data.get("create_date")
+                    domain_age_days = None
+                    if data.get("domain_age"):
+                        domain_age_days = data.get("domain_age")
+                    elif created_date:
+                        domain_age_days = calculate_domain_age_days(created_date)
+                    result_data = {
+                        "registrar": data.get("registrar", {}).get("name") or "Unable to verify",
+                        "createdDate": created_date,
+                        "expiresDate": data.get("expire_date"),
+                        "nameServers": data.get("nameservers", []),
+                        "domainAgeDays": domain_age_days,
+                        "sslSecure": True
+                    }
+                    print(f"\n[IP2WHOIS DEBUG] Retrieved Fallback Data for {website}:\n{result_data}\n")
+                    return result_data
+    except Exception as e:
+        print(f"[IP2WHOIS API] Error: {e}")
+    return None
+
+async def query_urlscan(website: str):
+    api_key = os.getenv("URLSCAN_API_KEY")
+    if not api_key or api_key == "your_key_here" or api_key.strip() == "":
+        return None
+    try:
+        url = f"https://urlscan.io/api/v1/search/?q=domain:{website}"
+        headers = {"API-Key": api_key}
+        async with httpx.AsyncClient() as client:
+            res = await client.get(url, headers=headers, timeout=8.0)
+            if res.status_code == 200:
+                results = res.json().get("results", [])
+                if results:
+                    latest = results[0]
+                    page = latest.get("page", {})
+                    result_data = {
+                        "server": page.get("server"),
+                        "ip": page.get("ip"),
+                        "country": page.get("country"),
+                        "city": page.get("city"),
+                        "asn": page.get("asnname")
+                    }
+                    print(f"\n[URLScan DEBUG] Retrieved Data for {website}:\n{result_data}\n")
+                    return result_data
+    except Exception as e:
+        print(f"[URLScan API] Error: {e}")
+    return None
+
+async def query_virustotal(website: str):
+    api_key = os.getenv("VIRUSTOTAL_API_KEY")
+    if not api_key or api_key == "your_key_here" or api_key.strip() == "":
+        return None
+    try:
+        import base64
+        url_id = base64.urlsafe_b64encode(website.encode()).decode().strip("=")
+        url = f"https://www.virustotal.com/api/v3/urls/{url_id}"
+        headers = {"x-apikey": api_key}
+        async with httpx.AsyncClient() as client:
+            res = await client.get(url, headers=headers, timeout=8.0)
+            if res.status_code == 200:
+                data = res.json().get("data", {}).get("attributes", {})
+                stats = data.get("last_analysis_stats", {})
+                result_data = {
+                    "malicious": stats.get("malicious", 0),
+                    "phishing": stats.get("suspicious", 0),
+                    "reputation": data.get("reputation", 0)
+                }
+                print(f"\n[VirusTotal DEBUG] Retrieved Data for {website}:\n{result_data}\n")
+                return result_data
+    except Exception as e:
+        print(f"[VirusTotal API] Error: {e}")
+    return None
+
+async def query_mailboxlayer(email: str):
+    api_key = os.getenv("MAILBOXLAYER_API_KEY")
+    if not api_key or api_key == "your_key_here" or api_key.strip() == "":
+        return None
+    try:
+        url = "http://apilayer.net/api/check"
+        params = {"access_key": api_key, "email": email}
+        async with httpx.AsyncClient() as client:
+            res = await client.get(url, params=params, timeout=8.0)
+            if res.status_code == 200:
+                data = res.json()
+                result_data = {
+                    "format_valid": data.get("format_valid"),
+                    "mx_found": data.get("mx_found"),
+                    "smtp_check": data.get("smtp_check"),
+                    "catch_all": data.get("catch_all"),
+                    "role": data.get("role"),
+                    "disposable": data.get("disposable"),
+                    "free": data.get("free"),
+                    "score": data.get("score")
+                }
+                print(f"\n[Mailboxlayer DEBUG] Retrieved Data for {email}:\n{result_data}\n")
+                return result_data
+    except Exception as e:
+        print(f"[Mailboxlayer API] Error: {e}")
+    return None
+
+async def query_gnews(company_name: str):
+    api_key = os.getenv("GNEWS_API_KEY")
+    if not api_key or api_key == "your_key_here" or api_key.strip() == "":
+        return None
+    try:
+        url = "https://gnews.io/api/v4/search"
+        params = {"q": f'"{company_name}"', "lang": "en", "max": 5, "apikey": api_key}
+        async with httpx.AsyncClient() as client:
+            res = await client.get(url, params=params, timeout=8.0)
+            if res.status_code == 200:
+                articles = res.json().get("articles", [])
+                hits = []
+                for a in articles:
+                    hits.append({
+                        "title": a.get("title"),
+                        "description": a.get("description"),
+                        "publishedAt": a.get("publishedAt"),
+                        "source": a.get("source", {}).get("name")
+                    })
+                print(f"\n[GNews DEBUG] Retrieved Data for {company_name}:\n{hits}\n")
+                return hits if hits else None
+    except Exception as e:
+        print(f"[GNews API] Error: {e}")
+    return None
+
+
 def calculate_domain_age_days(created_date_str: str) -> int:
     if not created_date_str:
         return None
@@ -476,6 +642,13 @@ async def query_whoisjson(website: str):
             ssl_task = client.get("https://whoisjson.com/api/v1/ssl-cert-check", params=params, headers=headers, timeout=12.0)
             
             whois_res, ssl_res = await asyncio.gather(whois_task, ssl_task)
+            
+            # --- IP2WHOIS Fallback ---
+            needs_fallback = website.endswith((".bh", ".ae", ".sa")) or whois_res.status_code != 200
+            if needs_fallback:
+                fallback_data = await query_ip2whois(website)
+                if fallback_data:
+                    return fallback_data
             
             ssl_secure = True
             if ssl_res.status_code == 200:
@@ -655,10 +828,7 @@ async def execute_adk_verification(
     elif country_lower in ["usa", "united states", "us"]:
         registry_task = query_sec_edgar(company_name)
     else:
-        # Create a dummy awaitable or return None
-        async def no_op():
-            return None
-        registry_task = no_op()
+        registry_task = query_orb_intelligence(company_name)
 
     industry_lower = industry.lower().strip()
     if industry_lower in ["technology", "software"]:
@@ -669,12 +839,16 @@ async def execute_adk_verification(
         github_task = no_op_github()
 
     print("[Python ADK Orchestrator] Starting external API queries in parallel...")
-    registry_data, link_finder_data, whois_data, github_data, opensanctions_data = await asyncio.gather(
+    registry_data, link_finder_data, whois_data, github_data, opensanctions_data, urlscan_data, virustotal_data, mailboxlayer_data, gnews_data = await asyncio.gather(
         registry_task,
         query_linkfinder(website),
         query_whoisjson(website),
         github_task,
-        query_opensanctions(company_name)
+        query_opensanctions(company_name),
+        query_urlscan(website),
+        query_virustotal(website),
+        query_mailboxlayer(f"info@{website}"),
+        query_gnews(company_name)
     )
     print("[Python ADK Orchestrator] External API queries completed. Starting Corporate Agent...")
     open_corp_data = registry_data
@@ -696,7 +870,10 @@ async def execute_adk_verification(
         f"API Ground Truth Domain Data:\n"
         f"- WhoisJSON Data: {json.dumps(whois_data) if whois_data else 'None'}\n"
         f"- GitHub Org Footprint: {json.dumps(github_data) if github_data else 'None'}\n"
-        f"- LinkedIn/Employee Data: {json.dumps(link_finder_data) if link_finder_data else 'None'}"
+        f"- LinkedIn/Employee Data: {json.dumps(link_finder_data) if link_finder_data else 'None'}\n"
+        f"- URLScan.io Data: {json.dumps(urlscan_data) if urlscan_data else 'None'}\n"
+        f"- VirusTotal Data: {json.dumps(virustotal_data) if virustotal_data else 'None'}\n"
+        f"- Mailboxlayer MX Data: {json.dumps(mailboxlayer_data) if mailboxlayer_data else 'None'}"
     )
     location_prompt = f"{input_message} Corporate details: {corporate_raw}. {f'Geoapify API metrics: {json.dumps(places_data)}' if places_data else ''}"
     regulatory_prompt = (
@@ -715,7 +892,10 @@ async def execute_adk_verification(
     await asyncio.sleep(1.0)
     
     # Pass corporate details to reputation and financial agents to prevent entity mismatch issues
-    reputation_prompt = f"{input_message} Corporate details: {corporate_raw}."
+    reputation_prompt = (
+        f"{input_message} Corporate details: {corporate_raw}.\n"
+        f"GNews API Recent Articles: {json.dumps(gnews_data) if gnews_data else 'None'}"
+    )
     financial_prompt = f"{input_message} Corporate details: {corporate_raw}."
     
     print("[Python ADK Orchestrator] Running Reputation Agent...")
