@@ -472,8 +472,8 @@ async def query_whoisjson(website: str):
         params = {"domain": website}
         async with httpx.AsyncClient() as client:
             # Query whois and ssl cert check in parallel
-            whois_task = client.get("https://whoisjson.com/api/v1/whois", params=params, headers=headers, timeout=5.0)
-            ssl_task = client.get("https://whoisjson.com/api/v1/ssl-cert-check", params=params, headers=headers, timeout=5.0)
+            whois_task = client.get("https://whoisjson.com/api/v1/whois", params=params, headers=headers, timeout=12.0)
+            ssl_task = client.get("https://whoisjson.com/api/v1/ssl-cert-check", params=params, headers=headers, timeout=12.0)
             
             whois_res, ssl_res = await asyncio.gather(whois_task, ssl_task)
             
@@ -945,6 +945,10 @@ async def execute_adk_verification(
     if final_details["validatedAddress"] == "Unable to verify":
         final_details["locationSuitability"] = "Address not verified"
 
+    # Extract risk agent summaries using robust keys to support LLM case mismatches
+    exec_summary = risk_obj.get("executiveSummary") or risk_obj.get("executive_summary") or risk_obj.get("summary")
+    directive_rec = risk_obj.get("recommendation") or risk_obj.get("actionable_advice") or risk_obj.get("recommendations")
+
     agent_results = {
         "corporate-agent": {
             "agentId": "corporate-agent",
@@ -1005,9 +1009,9 @@ async def execute_adk_verification(
             "agentName": "Risk Intelligence Agent",
             "score": risk_score,
             "status": "success" if rating == "GREEN" else ("warning" if rating == "AMBER" else ("danger" if rating == "RED" else "critical")),
-            "outputMessage": risk_obj.get("executiveSummary") or "Comprehensive risk validation logs compiled.",
+            "outputMessage": exec_summary or "Comprehensive risk validation logs compiled.",
             "evidence": ["Aggregated multi-agent consensus profiles"],
-            "keyFindings": [risk_obj.get("recommendation") or "Proceed with onboarding."]
+            "keyFindings": [directive_rec or "Proceed with onboarding."]
         }
     }
 
@@ -1034,8 +1038,8 @@ async def execute_adk_verification(
         "riskScore": risk_score,
         "riskRating": rating,
         "details": final_details,
-        "executiveSummary": risk_obj.get("executiveSummary") or "Evaluated and compiled.",
-        "recommendation": risk_obj.get("recommendation") or "Approved.",
+        "executiveSummary": exec_summary or "Evaluated and compiled.",
+        "recommendation": directive_rec or "Approved.",
         "agentResults": agent_results,
         "comments": [],
         "isRealTimeResult": True
