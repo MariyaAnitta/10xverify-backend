@@ -1013,10 +1013,33 @@ async def execute_adk_verification(
 
     # Apply strict validation checks and adjust scores/findings in place
     reg_num = clean_val(corp_obj.get("registrationNumber"))
+    
+    # Define whether entity is confirmable despite missing CR
+    is_confirmable_entity = (
+        # Has verified directors
+        bool(corp_obj.get("directors") and 
+             corp_obj.get("directors") != ["Unable to verify"]) or
+        # Is regulated (CBB, FCA, MHRA etc.)
+        any(kw in reg_obj.get("findings", "").lower() for kw in [
+            "central bank", "cbb", "fca", "mhra", "cqc", 
+            "sec", "fdic", "regulated"
+        ]) or
+        # Long-established domain (over 5 years)
+        (dig_obj.get("domainAgeDays") or 0) > 1825 or
+        # Known parent company verified
+        bool(corp_obj.get("shareholders") and 
+             corp_obj.get("shareholders") != ["Unable to verify"])
+    )
+
     if reg_num == "Unable to verify" or not corp_obj.get("registrationNumber"):
-        corp_obj["score"] = min(safe_score(corp_obj.get("score")), 45)
-        corp_obj["status"] = "critical"
-        corp_obj["findings"] = "Corporate registration number and official details could not be verified."
+        if is_confirmable_entity:
+            corp_obj["score"] = min(safe_score(corp_obj.get("score")), 75)
+            corp_obj["status"] = "warning"
+            corp_obj["findings"] = "Corporate registration number unable to verify through publicly available sources. Entity confirmed via verified directors, regulatory licensing, and/or established digital presence."
+        else:
+            corp_obj["score"] = min(safe_score(corp_obj.get("score")), 45)
+            corp_obj["status"] = "critical"
+            corp_obj["findings"] = "Corporate registration number and official details could not be verified through publicly available sources."
         corp_obj["registrationNumber"] = "Unable to verify"
 
     val_addr = clean_val(places_data.get("formattedAddress") if places_data else corp_obj.get("registeredAddress") or loc_obj.get("validatedAddress"))
