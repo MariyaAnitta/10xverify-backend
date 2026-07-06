@@ -1139,6 +1139,12 @@ async def execute_adk_verification(
 
     calculated_score = round(sum(scores[k] * weights[k] for k in weights))
 
+    # 5. Fatal Flaw Kill Switch
+    # If Regulatory or Reputation are in the critical danger zone (< 40), 
+    # the maximum possible overall score cannot exceed 59% (RED RISK).
+    if scores["regulatory"] < 40 or scores["reputation"] < 40:
+        calculated_score = min(calculated_score, 59)
+
     risk_input = f"""
       Corporate data: {json.dumps(corp_obj)}
       Digital data: {json.dumps(dig_obj)}
