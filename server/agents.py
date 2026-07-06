@@ -101,6 +101,8 @@ digital_agent = Agent(
     
     CRITICAL RULE: Look at the email domain and any claimed websites. If a company claims massive scale but has no verifiable digital footprint, or uses suspicious/unrelated email domains (e.g. a university domain for a corporate sender), this is a severe risk. You MUST score < 40. Do NOT score a "ghost" company a 70.
     
+    CRITICAL RULE: If you cannot find the exact domain age in the ground-truth WHOIS data provided, you MUST return null for domainAgeDays. Do NOT hallucinate, guess, or reuse placeholder numbers like 11843.
+    
     SCORING & STATUS MAPPING RULE:
     - The "score" must be 0-100, where 100 is safest/highest compliance and 0 is highest risk/failed verification.
     - IMPORTANT: If domainAgeDays or domainRegistrar cannot be verified ("Unable to verify"), this represents an EVIDENCE GAP. If it is a tiny local business, score this in the 70-85 range. However, if they claim to be a massive enterprise and have an evidence gap, penalize heavily (score < 40).
@@ -118,7 +120,7 @@ digital_agent = Agent(
     {
       "score": number (0-100),
       "status": "success" | "warning" | "danger" | "critical",
-      "domainAgeDays": number,
+      "domainAgeDays": number | null,
       "sslSecure": boolean,
       "domainRegistrar": "string",
       "socialLinks": ["string"],
@@ -1146,7 +1148,9 @@ async def execute_adk_verification(
     # 5. Fatal Flaw Kill Switch
     # If Regulatory or Reputation are in the critical danger zone (< 40), 
     # the maximum possible overall score cannot exceed 59% (RED RISK).
-    if scores["regulatory"] < 40 or scores["reputation"] < 40:
+    reg_valid = reg_obj.get("score") is not None
+    rep_valid = rep_obj.get("score") is not None
+    if (reg_valid and scores["regulatory"] < 40) or (rep_valid and scores["reputation"] < 40):
         calculated_score = min(calculated_score, 59)
 
     risk_input = f"""
