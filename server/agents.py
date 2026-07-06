@@ -322,7 +322,9 @@ def get_jurisdiction_code(country: str) -> str:
         "india": "in",
         "singapore": "sg",
         "germany": "de",
-        "france": "fr"
+        "france": "fr",
+        "bahrain": "bh",
+        "bh": "bh"
     }
     return mapping.get(country.lower().strip(), "")
 
@@ -898,7 +900,7 @@ async def execute_adk_verification(
     solvency = clean_val(fin_obj.get("solvencyStatus"))
     credit = clean_val(fin_obj.get("creditScoreEst"))
     if solvency == "Unable to verify" or credit == "Unable to verify":
-        fin_obj["score"] = min(safe_score(fin_obj.get("score")), 50)
+        fin_obj["score"] = 45
         fin_obj["status"] = "warning"
         fin_obj["findings"] = "Solvency and credit rating cannot be verified due to lack of public financial filings."
         fin_obj["solvencyStatus"] = "Unable to verify"
