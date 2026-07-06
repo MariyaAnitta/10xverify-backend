@@ -490,8 +490,6 @@ async def query_linkfinder(website: str):
                     "industry": data.get("industry") or "",
                     "foundedYear": data.get("founded_year")
                 }
-    except Exception as e:
-        print(f"[LinkFinder API] Error: {e}")
     return None
 
 def calculate_domain_age_days(created_date_str: str) -> int:
@@ -499,13 +497,14 @@ def calculate_domain_age_days(created_date_str: str) -> int:
         return None
     try:
         import datetime
-        # Simple parser that handles YYYY-MM-DD or ISO formats
-        date_part = created_date_str.split("T")[0]
+        # Split by T or space to extract YYYY-MM-DD
+        date_part = created_date_str.split("T")[0].split(" ")[0].strip()
         parts = [int(p) for p in date_part.replace("/", "-").split("-")]
         created_date = datetime.datetime(parts[0], parts[1], parts[2])
         return (datetime.datetime.now() - created_date).days
     except Exception:
         return None
+
 
 async def query_whoisjson(website: str):
     api_key = os.getenv("WHOISJSON_API_KEY")
@@ -529,13 +528,33 @@ async def query_whoisjson(website: str):
             if whois_res.status_code == 200:
                 data = whois_res.json()
                 whois_info = data.get("whois", {}) or data
-                created_date = whois_info.get("created_date") or whois_info.get("creation_date")
+                
+                # Check for various created/expires key mappings in whoisjson response
+                created_date = whois_info.get("created") or whois_info.get("created_date") or whois_info.get("creation_date")
+                expires_date = whois_info.get("expires") or whois_info.get("expires_date") or whois_info.get("expiration_date")
+                
+                registrar_raw = whois_info.get("registrar") or whois_info.get("registrar_name")
+                registrar_name = None
+                if isinstance(registrar_raw, dict):
+                    registrar_name = registrar_raw.get("name")
+                elif isinstance(registrar_raw, str):
+                    registrar_name = registrar_raw
+                
+                domain_age_days = None
+                age_raw = whois_info.get("age")
+                if isinstance(age_raw, dict) and "days" in age_raw:
+                    domain_age_days = age_raw.get("days")
+                elif isinstance(age_raw, int):
+                    domain_age_days = age_raw
+                elif created_date:
+                    domain_age_days = calculate_domain_age_days(created_date)
+                
                 return {
-                    "registrar": whois_info.get("registrar") or whois_info.get("registrar_name"),
+                    "registrar": registrar_name or "Unable to verify",
                     "createdDate": created_date,
-                    "expiresDate": whois_info.get("expires_date") or whois_info.get("expiration_date"),
+                    "expiresDate": expires_date,
                     "nameServers": whois_info.get("nameservers") or whois_info.get("name_servers"),
-                    "domainAgeDays": calculate_domain_age_days(created_date),
+                    "domainAgeDays": domain_age_days,
                     "sslSecure": ssl_secure
                 }
     except Exception as e:
