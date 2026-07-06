@@ -290,6 +290,8 @@ async def screen_vendor(payload: ScreenRequest):
         db_fs.collection("vendors").document(vendor_id).set(result)
         return result
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"ADK Agent execution failed: {e}")
 
 @app.post("/api/power-automate/screen", response_class=HTMLResponse)
@@ -398,6 +400,8 @@ async def power_automate_webhook(request: Request):
         return html_report
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print(f"[Power Automate Webhook] Error: {e}")
         return HTMLResponse(f"<html><body><h1>Error</h1><p>Internal verification failed: {e}</p></body></html>", status_code=500)
 
