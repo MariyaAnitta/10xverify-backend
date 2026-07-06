@@ -184,6 +184,8 @@ regulatory_agent = Agent(
     
     CRITICAL RULE: If the licenses, sanctions risk, or compliance indicators cannot be verified, are missing, or are not found in the ground-truth API data or tools, you MUST return "Unable to verify" for that field. Do NOT guess or hallucinate any details.
     
+    STRICT ANTI-CONFLATION RULE (LEGAL LIABILITY): You must NEVER attribute specific penalties, prison sentences, fines, or closures to the target entity unless the target entity or its direct management are explicitly named in the source article alongside those penalties. Do not merge, guess, or conflate generic news about industry crackdowns, unnamed defendants, or older unrelated cases with the specific company you are researching. If the target company is named, cite ONLY the exact facts attributed to them. Fabricating legal outcomes is a severe failure.
+    
     SCORING & STATUS MAPPING RULE:
     - The "score" must be 0-100, where 100 is safest/highest compliance and 0 is highest risk/banned status.
     - HISTORICAL VS ACTIVE CLASSIFICATION:
@@ -222,6 +224,8 @@ reputation_agent = Agent(
     CRITICAL RULE (SCORING INVERSION FIX): Absence of adverse media does NOT equal a perfect reputation if the company has no verifiable digital footprint or existence. If the company is a "ghost" with no footprint, their reputation cannot be verified. You MUST score < 40 for unverified existence, instead of scoring 100 for "no bad news."
     
     CRITICAL RULE: If the reputation history, customer complaints, or adverse media details cannot be verified, are missing, or are not found, you MUST return "Unable to verify" for strings and null/false for boolean indicators (specifying in findings that it's unverified) instead of guessing. Do NOT guess or hallucinate any details.
+    
+    STRICT ANTI-CONFLATION RULE (LEGAL LIABILITY): You must NEVER attribute specific penalties, prison sentences, fines, or closures to the target entity unless the target entity or its direct management are explicitly named in the source article alongside those penalties. Do not merge, guess, or conflate generic news about industry crackdowns, unnamed defendants, or older unrelated cases with the specific company you are researching. If the target company is named, cite ONLY the exact facts attributed to them. Fabricating legal outcomes is a severe failure.
     
     SCORING & STATUS MAPPING RULE:
     - The "score" must be 0-100, where 100 is the best reputation (no adverse media, or only unproven/low-relevance/dismissed allegations) and 0 is the worst reputation (severe adjudicated fraud, bankruptcies, criminal convictions).
