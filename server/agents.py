@@ -490,6 +490,8 @@ async def query_linkfinder(website: str):
                     "industry": data.get("industry") or "",
                     "foundedYear": data.get("founded_year")
                 }
+    except Exception as e:
+        print(f"[LinkFinder API] Error: {e}")
     return None
 
 def calculate_domain_age_days(created_date_str: str) -> int:
