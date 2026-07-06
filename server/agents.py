@@ -313,53 +313,6 @@ risk_intelligence_agent = Agent(
 # Helper API Callers
 # ---------------------------------------------------------
 
-def get_jurisdiction_code(country: str) -> str:
-    mapping = {
-        "united kingdom": "gb",
-        "uk": "gb",
-        "united states": "us",
-        "usa": "us",
-        "india": "in",
-        "singapore": "sg",
-        "germany": "de",
-        "france": "fr",
-        "bahrain": "bh",
-        "bh": "bh"
-    }
-    return mapping.get(country.lower().strip(), "")
-
-async def query_opencorporates(company_name: str, country: str):
-    api_key = os.getenv("OPENCORPORATES_API_KEY")
-    if not api_key or api_key == "MY_OPENCORPORATES_API_KEY":
-        return None
-    j_code = get_jurisdiction_code(country)
-    try:
-        url = "https://api.opencorporates.com/v0.4/companies/search"
-        async with httpx.AsyncClient() as client:
-            res = await client.get(url, params={
-                "q": company_name,
-                "jurisdiction_code": j_code or None,
-                "api_token": api_key
-            }, timeout=5.0)
-            
-            companies = res.json().get("results", {}).get("companies", [])
-            if companies:
-                candidates = []
-                for item in companies[:5]:
-                    match = item["company"]
-                    candidates.append({
-                        "companyName": match.get("name"),
-                        "registrationNumber": match.get("company_number"),
-                        "incorporationDate": match.get("incorporation_date"),
-                        "legalStatus": match.get("current_status") or "Active",
-                        "registeredAddress": match.get("registered_address_in_full"),
-                        "registryUrl": match.get("opencorporates_url")
-                    })
-                return candidates
-    except Exception as e:
-        print(f"[OpenCorporates API] Error querying registry: {e}")
-    return None
-
 async def query_companies_house(company_name: str):
     api_key = os.getenv("COMPANIES_HOUSE_API_KEY")
     if not api_key or api_key == "your_key_here" or api_key.strip() == "":
@@ -697,10 +650,7 @@ async def execute_adk_verification(
     registry_data = None
     country_lower = country.lower().strip()
     
-    open_corp_key = os.getenv("OPENCORPORATES_API_KEY")
-    if open_corp_key and open_corp_key != "your_key_here" and open_corp_key.strip() != "":
-        registry_task = query_opencorporates(company_name, country)
-    elif country_lower in ["uk", "united kingdom", "gb"]:
+    if country_lower in ["uk", "united kingdom", "gb"]:
         registry_task = query_companies_house(company_name)
     elif country_lower in ["usa", "united states", "us"]:
         registry_task = query_sec_edgar(company_name)
