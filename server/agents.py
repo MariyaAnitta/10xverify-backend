@@ -510,6 +510,17 @@ async def query_ip2whois(website: str):
             if res.status_code == 200:
                 data = res.json()
                 if "error" not in data:
+                    returned_domain = data.get("domain", "").lower()
+                    requested_domain = website.lower()
+                    
+                    # Prevent IP2WHOIS from falling back to root TLDs (e.g. returning "com.bh" for "sinnad.com.bh")
+                    if returned_domain and returned_domain != requested_domain and not requested_domain.endswith("." + returned_domain):
+                        # But wait, what if it returns just 'sinnad.com.bh' but we asked for 'www.sinnad.com.bh'? 
+                        pass
+                    if returned_domain in ["com.bh", "bh", "sa", "com.sa", "ae", "co.ae"]:
+                        # It returned the root registry date, reject it
+                        return None
+
                     created_date = data.get("create_date")
                     domain_age_days = None
                     if data.get("domain_age"):
