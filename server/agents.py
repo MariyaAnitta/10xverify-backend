@@ -42,6 +42,8 @@ corporate_agent = Agent(
     
     CRITICAL RULE FOR IDENTITY MATCHING: Check for strict name matching between the entity claimed in the email (e.g. "NHC Pharm LTD") and the actual registered entity (e.g. "NHC LIMITED"). If there is a significant identity mismatch or you match to a generic shell company, it is a high fraud risk. Score MUST be < 50, and you must flag the discrepancy in your findings.
     
+    STRICT LEGAL ENTITY RESOLUTION: You must strictly differentiate between a parent Holding Company and its operating subsidiaries. Identify the exact legal status of the specific subsidiary being queried. Furthermore, you MUST preserve the exact legal suffix as found in public records (e.g., 'W.L.L.', 'B.S.C. (Closed)', 'B.S.C. (c)'). Do not generalize or remove bracketed legal qualifiers.
+
     CRITICAL RULE: If any of the required attributes (e.g. registrationNumber, incorporationDate, directors, legalStatus, registeredAddress) cannot be verified, are missing, or are not found in the ground-truth API data or tools, you MUST return "Unable to verify" (or a list containing "Unable to verify" for directors/shareholders) for that field. Do NOT guess or hallucinate any details.
     
     ENTITY-DISAMBIGUATION MATCH CONFIDENCE:
