@@ -513,20 +513,24 @@ async def query_ip2whois(website: str):
                     returned_domain = data.get("domain", "").lower()
                     requested_domain = website.lower()
                     
-                    # Prevent IP2WHOIS from falling back to root TLDs (e.g. returning "com.bh" for "sinnad.com.bh")
-                    if returned_domain and returned_domain != requested_domain and not requested_domain.endswith("." + returned_domain):
-                        # But wait, what if it returns just 'sinnad.com.bh' but we asked for 'www.sinnad.com.bh'? 
-                        pass
                     if returned_domain in ["com.bh", "bh", "sa", "com.sa", "ae", "co.ae"]:
                         # It returned the root registry date, reject it
                         return None
-
+                        
                     created_date = data.get("create_date")
+                    
+                    # IP2WHOIS Fake Match Bug: 
+                    # If it can't find a .bh domain, it claims it found it, but returns the 
+                    # Telecommunications Regulatory Authority's root creation date (1994-02-01)
+                    if created_date == "1994-02-01T00:00:00+00:00" or data.get("domain_age") == 11843:
+                        return None
+
                     domain_age_days = None
                     if data.get("domain_age"):
                         domain_age_days = data.get("domain_age")
                     elif created_date:
                         domain_age_days = calculate_domain_age_days(created_date)
+                        
                     result_data = {
                         "registrar": data.get("registrar", {}).get("name") or "Unable to verify",
                         "createdDate": created_date,
