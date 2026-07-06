@@ -14,7 +14,7 @@ interface UserProfile {
 }
 
 const DEFAULT_USERS: UserProfile[] = [
-  { email: "anitta@10xverify.ai", name: "M. Anitta", role: "Compliance Officer" },
+  { email: "complianceofficer@10xverify.ai", name: "M. Anitta", role: "Compliance Officer" },
   { email: "officer@10xverify.ai", name: "V. Officer", role: "Vetting Officer" }
 ];
 
@@ -208,7 +208,17 @@ export default function App() {
     // Simulate password check (since we aren't changing the backend DB)
     const user = DEFAULT_USERS.find(u => u.email.toLowerCase() === loginEmail.toLowerCase());
     
-    if (user && loginPassword === "admin123") {
+    let isPasswordCorrect = false;
+    if (user) {
+      const emailLower = user.email.toLowerCase();
+      if (emailLower === "complianceofficer@10xverify.ai" && loginPassword === "admin123") {
+        isPasswordCorrect = true;
+      } else if (emailLower === "officer@10xverify.ai" && loginPassword === "verify123") {
+        isPasswordCorrect = true;
+      }
+    }
+
+    if (user && isPasswordCorrect) {
       setCurrentUser(user);
       localStorage.setItem("10xverify_user", JSON.stringify(user));
       // Clear form
