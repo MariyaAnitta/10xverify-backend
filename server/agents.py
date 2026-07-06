@@ -58,6 +58,8 @@ corporate_agent = Agent(
       * score 40-59: "danger"
       * score < 40: "critical"
     
+    STABILITY RULE: If you find verified positive evidence (confirmed directors, confirmed address, confirmed licence), anchor your score to that evidence. Do not lower your score below 70% simply because some details could not be found through search — absence of search results is not evidence of risk for an established entity.
+
     CRITICAL FORMATTING RULE: Keep the "findings" extremely short, concise, and up to the point (maximum 1-2 sentences). Do NOT write long paragraphs.
     
     Output a JSON block:
@@ -106,6 +108,8 @@ digital_agent = Agent(
       * score 40-59: "danger"
       * score < 40: "critical"
     
+    STABILITY RULE: If you find verified positive evidence (confirmed directors, confirmed address, confirmed licence), anchor your score to that evidence. Do not lower your score below 70% simply because some details could not be found through search — absence of search results is not evidence of risk for an established entity.
+
     CRITICAL FORMATTING RULE: Keep the "findings" extremely short, concise, and up to the point (maximum 1-2 sentences). Do NOT write long paragraphs.
     
     Output a JSON block:
@@ -145,6 +149,8 @@ location_agent = Agent(
       * score 40-59: "danger"
       * score < 40: "critical"
     
+    STABILITY RULE: If you find verified positive evidence (confirmed directors, confirmed address, confirmed licence), anchor your score to that evidence. Do not lower your score below 70% simply because some details could not be found through search — absence of search results is not evidence of risk for an established entity.
+
     CRITICAL FORMATTING RULE: Keep the "findings" extremely short, concise, and up to the point (maximum 1-2 sentences). Do NOT write long paragraphs.
     
     Output a JSON block:
@@ -188,6 +194,8 @@ regulatory_agent = Agent(
       * score 40-59: "danger"
       * score < 40: "critical"
     
+    STABILITY RULE: If you find verified positive evidence (confirmed directors, confirmed address, confirmed licence), anchor your score to that evidence. Do not lower your score below 70% simply because some details could not be found through search — absence of search results is not evidence of risk for an established entity.
+
     CRITICAL FORMATTING RULE: Keep the "findings" extremely short, concise, and up to the point (maximum 1-2 sentences). Do NOT write long paragraphs.
     
     Output a JSON block:
@@ -231,6 +239,8 @@ reputation_agent = Agent(
       * score 40-59: "danger"
       * score < 40: "critical"
     
+    STABILITY RULE: If you find verified positive evidence (confirmed directors, confirmed address, confirmed licence), anchor your score to that evidence. Do not lower your score below 70% simply because some details could not be found through search — absence of search results is not evidence of risk for an established entity.
+
     CRITICAL FORMATTING RULE: Keep the "findings" extremely short, concise, and up to the point (maximum 1-2 sentences). Do NOT write long paragraphs.
     
     Output a JSON block:
@@ -265,6 +275,8 @@ financial_agent = Agent(
       * score 40-59: "danger"
       * score < 40: "critical"
     
+    STABILITY RULE: If you find verified positive evidence (confirmed directors, confirmed address, confirmed licence), anchor your score to that evidence. Do not lower your score below 70% simply because some details could not be found through search — absence of search results is not evidence of risk for an established entity.
+
     CRITICAL FORMATTING RULE: Keep the "findings" extremely short, concise, and up to the point (maximum 1-2 sentences). Do NOT write long paragraphs.
     
     Output a JSON block:
@@ -932,6 +944,17 @@ async def execute_adk_verification(
     # 3. Regulatory Agent Override
     if fin_obj.get("solvencyStatus") == "Insolvent":
         reg_obj["score"] = min(reg_obj.get("score", 100), 35)
+
+    # 3a. GCC Healthcare Rule
+    is_healthcare = "healthcare" in industry.lower() or "pharma" in industry.lower() or "medical" in industry.lower()
+    gcc_countries = ["bahrain", "uae", "saudi", "kuwait", "qatar", "oman"]
+    is_gcc = any(c in country.lower() for c in gcc_countries)
+
+    if is_healthcare and is_gcc:
+        if reg_obj.get("score", 100) < 70 and "sanctions" not in reg_obj.get("findings", "").lower():
+            reg_obj["score"] = 70
+            reg_obj["findings"] = reg_obj.get("findings", "") + " Note: NHRA/regulatory licences for GCC healthcare entities are not publicly queryable via API — inability to verify does not indicate non-compliance."
+
 
     # 3b. Sanctions SDN Status validation override
     # Verify if any of the datasets in OpenSanctions match actual trade/financial blocking sanctions lists
