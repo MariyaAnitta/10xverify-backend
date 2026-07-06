@@ -268,13 +268,13 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
 
         <div className="space-y-3">
           {Object.entries(vendor.agentResults).map(([agentKey, results]) => {
-            const isExpanded = expandedAgent === agentKey;
+            const isExpanded = pdfMode || expandedAgent === agentKey;
             return (
               <div key={agentKey} className="border border-slate-100 rounded-xl overflow-hidden text-xs">
                 {/* Header/trigger */}
                 <div
-                  onClick={() => setExpandedAgent(isExpanded ? null : agentKey)}
-                  className="bg-slate-50/50 hover:bg-slate-50 px-4 py-3 cursor-pointer flex items-center justify-between transition-colors gap-3"
+                  onClick={() => !pdfMode && setExpandedAgent(isExpanded ? null : agentKey)}
+                  className={`bg-slate-50/50 hover:bg-slate-50 px-4 py-3 ${pdfMode ? "" : "cursor-pointer"} flex items-center justify-between transition-colors gap-3`}
                 >
                   <div className="flex items-center gap-3">
                     <div className={`px-2 py-0.5 rounded text-[10px] font-bold border ${getAgentColor(results.status)}`}>
@@ -282,11 +282,13 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
                     </div>
                     <span className="font-bold text-slate-800">{results.agentName}</span>
                   </div>
-
-                  <div className="flex items-center gap-2">
-                    <span className="text-xxs text-slate-400 uppercase tracking-widest font-semibold hidden sm:inline">Folder dossier</span>
-                    {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                  </div>
+ 
+                  {!pdfMode && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xxs text-slate-400 uppercase tracking-widest font-semibold hidden sm:inline">Folder dossier</span>
+                      {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                    </div>
+                  )}
                 </div>
 
                 {isExpanded && (
