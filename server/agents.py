@@ -653,7 +653,6 @@ async def run_agent(agent: Agent, message: str) -> str:
 def parse_json_block(text: str):
     try:
         # Find JSON payload structure
-        import re
         match = re.search(r"\{[\s\S]*\}", text)
         if match:
             return json.loads(match.group(0))
@@ -1040,7 +1039,6 @@ async def execute_adk_verification(
     }
 
     import hashlib
-    import re
     # Normalize company name (remove brackets, suffixes, and non-alphanumeric characters)
     n = company_name.lower()
     n = re.sub(r'\(.*?\)', '', n)
