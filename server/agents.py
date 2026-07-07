@@ -25,7 +25,6 @@ else:
     )
 
 # Define 7 ADK Agents in Python
-# Define 7 ADK Agents in Python
 corporate_agent = Agent(
     name="corporate_agent",
     description="Verifies company registration, incorporation date, officers, legal status and directorship details.",
@@ -34,6 +33,8 @@ corporate_agent = Agent(
     Analyze registration records for the company.
     Find registration number, incorporation date, legal status, directors.
     Also find the official corporate website of the target company and return it in the "website" field.
+    
+    STRICT RULE FOR ARRAYS: `evidenceRecords` and `coreAuditFindings` MUST be extremely short, punchy key-value pairs or 2-5 word phrases (e.g., "Registration: Verified", "Status: Active"). Do not write full sentences in the arrays.
     
     If ground-truth API metadata containing a list of match candidates is provided in the query:
     - Compare the candidate names, addresses, and descriptions against the target company name, website, and industry.
@@ -117,6 +118,9 @@ digital_agent = Agent(
     STABILITY RULE: If you find verified positive evidence (confirmed directors, confirmed address, confirmed licence), anchor your score to that evidence. Do not lower your score below 70% simply because some details could not be found through search — absence of search results is not evidence of risk for an established entity.
 
     CRITICAL FORMATTING RULE: Keep the "findings" extremely short, concise, and up to the point (maximum 1-2 sentences). Do NOT write long paragraphs.
+    STRICT RULE FOR ARRAYS: `evidenceRecords` and `coreAuditFindings` MUST be extremely short, punchy key-value pairs or 2-5 word phrases (e.g., "SSL: Secure", "Domain Age: 10 Years"). Do not write full sentences. 
+    IMPORTANT: ONLY list digital footprint findings. Do NOT list the company's legal name, registration number, directors, or incorporation date. Leave corporate details to the Corporate Agent.
+    Ignore generic `info@` email SMTP failures unless explicitly asked to verify an email address.
     
     Output a JSON block:
     {
@@ -162,6 +166,8 @@ location_agent = Agent(
     ANTI-HALLUCINATION RULE: Do not state that an address is "shared by other companies" or "a generic registration address" unless you have explicit proof. Many authentic companies are registered to residential addresses.
 
     CRITICAL FORMATTING RULE: Keep the "findings" extremely short, concise, and up to the point (maximum 1-2 sentences). Do NOT write long paragraphs.
+    STRICT RULE FOR ARRAYS: `evidenceRecords` and `coreAuditFindings` MUST be extremely short, punchy 2-5 word phrases (e.g., "Address: Residential", "Mismatch: Detected"). Do not write full sentences.
+    IMPORTANT: ONLY list location and address findings. Do NOT list the company's legal name, registration number, or directors. Leave corporate details to the Corporate Agent.
     
     Output a JSON block:
     {
@@ -211,6 +217,8 @@ regulatory_agent = Agent(
     STABILITY RULE: If you find verified positive evidence (confirmed directors, confirmed address, confirmed licence), anchor your score to that evidence. Do not lower your score below 70% simply because some details could not be found through search — absence of search results is not evidence of risk for an established entity.
 
     CRITICAL FORMATTING RULE: Keep the "findings" extremely short, concise, and up to the point (maximum 1-2 sentences). Do NOT write long paragraphs.
+    STRICT RULE FOR ARRAYS: `evidenceRecords` and `coreAuditFindings` MUST be extremely short, punchy 2-5 word phrases (e.g., "Sanctions: None", "Licenses: Verified"). Do not write full sentences.
+    IMPORTANT: ONLY list regulatory and sanctions findings. Do NOT list the company's legal name, registration number, or directors. Leave corporate details to the Corporate Agent.
     
     Output a JSON block:
     {
@@ -260,6 +268,8 @@ reputation_agent = Agent(
     STABILITY RULE: If you find verified positive evidence (confirmed directors, confirmed address, confirmed licence), anchor your score to that evidence. Do not lower your score below 70% simply because some details could not be found through search — absence of search results is not evidence of risk for an established entity.
 
     CRITICAL FORMATTING RULE: Keep the "findings" extremely short, concise, and up to the point (maximum 1-2 sentences). Do NOT write long paragraphs.
+    STRICT RULE FOR ARRAYS: `evidenceRecords` and `coreAuditFindings` MUST be extremely short, punchy 2-5 word phrases (e.g., "Adverse Media: None", "Reputation: Positive"). Do not write full sentences.
+    IMPORTANT: ONLY list reputation findings. Do NOT list the company's legal name, registration number, or directors. Leave corporate details to the Corporate Agent.
     
     Output a JSON block:
     {
@@ -298,6 +308,8 @@ financial_agent = Agent(
     STABILITY RULE: If you find verified positive evidence (confirmed directors, confirmed address, confirmed licence), anchor your score to that evidence. Do not lower your score below 70% simply because some details could not be found through search — absence of search results is not evidence of risk for an established entity.
 
     CRITICAL FORMATTING RULE: Keep the "findings" extremely short, concise, and up to the point (maximum 1-2 sentences). Do NOT write long paragraphs.
+    STRICT RULE FOR ARRAYS: `evidenceRecords` and `coreAuditFindings` MUST be extremely short, punchy 2-5 word phrases (e.g., "Revenue: 10Cr", "Solvency: Verified"). Do not write full sentences.
+    IMPORTANT: ONLY list financial findings. Do NOT list the company's legal name, registration number, or directors. Leave corporate details to the Corporate Agent.
     
     Output a JSON block:
     {
@@ -331,7 +343,8 @@ risk_intelligence_agent = Agent(
     - RED (High Risk): overallScore 40-59, or severe active operational, safety, or regulatory issues (e.g. ongoing FAA safety groundings, active FAA production caps) where the company is still active and solvent.
     - BLACK (Critical Block): overallScore < 40, or active international sanctions, active insolvency/bankruptcy (e.g. ceased operations, in administration), or adjudicated corporate fraud (do not engage).
     
-    CRITICAL FORMATTING RULE: Keep the "executiveSummary" and "recommendation" extremely short, concise, and to the point. Make each a maximum of 2 sentences. Do NOT write long lists or paragraphs.
+    CRITICAL FORMATTING RULE: Keep the "executiveSummary" and "recommendation" extremely short, concise, and to the point. Make each a maximum of 2 sentences.
+    STRICT RULE FOR ARRAYS: `evidenceRecords` and `coreAuditFindings` MUST be extremely short, punchy 2-5 word phrases (e.g., "Risk: Low", "Sanctions: Clear"). Do not write full sentences or long lists of corporate details.
     
     Output a JSON block:
     {
