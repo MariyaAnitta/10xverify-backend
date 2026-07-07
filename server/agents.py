@@ -76,7 +76,9 @@ corporate_agent = Agent(
       "shareholders": ["string"],
       "registeredAddress": "string",
       "website": "string",
-      "findings": "string"
+      "findings": "string",
+      "evidenceRecords": ["string", "string"],
+      "coreAuditFindings": ["string", "string"]
     }
     """,
     tools=[google_search]
@@ -124,7 +126,9 @@ digital_agent = Agent(
       "sslSecure": boolean,
       "domainRegistrar": "string",
       "socialLinks": ["string"],
-      "findings": "string"
+      "findings": "string",
+      "evidenceRecords": ["string", "string"],
+      "coreAuditFindings": ["string", "string"]
     }
     """,
     tools=[google_search]
@@ -143,7 +147,7 @@ location_agent = Agent(
     SCORING & STATUS MAPPING RULE:
     - The "score" must be 0-100, where 100 is safest/highest compliance and 0 is highest risk.
     - IMPORTANT: 
-      * You MUST use the google_search tool to find the actual operating offices/clinics/headquarters of the target company and COMPARE it to the registry address (provided in the Corporate details).
+      * You MUST use the google_search tool to find the actual operating offices/clinics/headquarters of the target company and COMPARE it to the registry address (provided in the Corporate details). Pay special attention to international HQs (e.g., a company registered in India but operationally headquartered in Abu Dhabi/UAE).
       * If there is a major discrepancy/mismatch between the registry address (e.g. registered to a small street in Birmingham) and the actual well-known operational headquarters of the telehealth company (e.g. Knightsbridge/Euston in London), this represents a high MISMATCH RISK. You MUST heavily penalize the location score (scoring it in the 20-40% range) and document the address mismatch warning clearly in your findings.
       * If the registered address is identified as a statutory/registered agent address (e.g. a law firm or registered agent service), this is standard practice for US/UK corporations — do not penalize. Only penalize if the registered address is residential, a virtual mailbox with no commercial presence, or completely unrelated to the company's known operational geography.
       * If the registry address matches the operational footprint and is valid, but specific building/site suitability evidence is simply incomplete, score it in the 75-90 range. A real commercial address that matches the registered entity and has no mismatch = score 70-85. Do not score below 50 unless there is a confirmed mismatch between registered address and known operational HQ.
@@ -154,6 +158,8 @@ location_agent = Agent(
       * score < 40: "critical"
     
     STABILITY RULE: If you find verified positive evidence (confirmed directors, confirmed address, confirmed licence), anchor your score to that evidence. Do not lower your score below 70% simply because some details could not be found through search — absence of search results is not evidence of risk for an established entity.
+    
+    ANTI-HALLUCINATION RULE: Do not state that an address is "shared by other companies" or "a generic registration address" unless you have explicit proof. Many authentic companies are registered to residential addresses.
 
     CRITICAL FORMATTING RULE: Keep the "findings" extremely short, concise, and up to the point (maximum 1-2 sentences). Do NOT write long paragraphs.
     
@@ -164,7 +170,9 @@ location_agent = Agent(
       "validatedAddress": "string",
       "locationSuitability": "string",
       "officeType": "string",
-      "findings": "string"
+      "findings": "string",
+      "evidenceRecords": ["string", "string"],
+      "coreAuditFindings": ["string", "string"]
     }
     """,
     tools=[google_search]
@@ -210,7 +218,9 @@ regulatory_agent = Agent(
       "status": "success" | "warning" | "danger" | "critical",
       "complianceLicenses": ["string"],
       "sanctionsRisk": "None" | "Medium" | "High" | "Unable to verify",
-      "findings": "string"
+      "findings": "string",
+      "evidenceRecords": ["string", "string"],
+      "coreAuditFindings": ["string", "string"]
     }
     """,
     tools=[google_search]
@@ -256,7 +266,9 @@ reputation_agent = Agent(
       "score": number (0-100),
       "status": "success" | "warning" | "danger" | "critical",
       "adverseMediaFound": boolean | null,
-      "findings": "string"
+      "findings": "string",
+      "evidenceRecords": ["string", "string"],
+      "coreAuditFindings": ["string", "string"]
     }
     """,
     tools=[google_search]
@@ -267,7 +279,7 @@ financial_agent = Agent(
     description="Reviews approximate revenue status, solvency indicators and credit ratings.",
     model=llm,
     instruction="""
-    Analyze financial health, solvency indicators, and credit health approximations.
+    Analyze financial health, solvency indicators, and credit health approximations. Use google_search to look for specific corporate registry financial data, such as MCA (Ministry of Corporate Affairs) filings for Indian companies. Look for "Authorized Share Capital", "Paid-up Capital", and recent "Revenue" figures.
     
     EXTRAORDINARY CLAIMS RULE: Compare their claims against reality. If a company claims massive infrastructure (e.g. 8 manufacturing plants, 900 scientists) but has zero financial footprint, public filings, or verifiable solvency, it is a critical failure. Score < 40 instead of leaving it neutral.
     
@@ -293,7 +305,9 @@ financial_agent = Agent(
       "status": "success" | "warning" | "danger" | "critical",
       "solvencyStatus": "Solvent" | "High Risk" | "Insolvent" | "Unable to verify",
       "creditScoreEst": "string",
-      "findings": "string"
+      "findings": "string",
+      "evidenceRecords": ["string", "string"],
+      "coreAuditFindings": ["string", "string"]
     }
     """,
     tools=[google_search]
@@ -324,7 +338,9 @@ risk_intelligence_agent = Agent(
       "overallScore": number (0-100),
       "rating": "GREEN" | "AMBER" | "RED" | "BLACK",
       "executiveSummary": "string",
-      "recommendation": "string"
+      "recommendation": "string",
+      "evidenceRecords": ["string", "string"],
+      "coreAuditFindings": ["string", "string"]
     }
     """
 )
@@ -448,25 +464,39 @@ async def query_sec_edgar(company_name: str):
     return None
 
 async def query_linkfinder(website: str):
-    api_key = os.getenv("LINKFINDER_API_KEY")
-    if not api_key or api_key == "MY_LINKFINDER_API_KEY":
+    # Updated to use GetProspect API
+    api_key = os.getenv("GETPROSPECT_API_KEY") or os.getenv("LINKFINDER_API_KEY")
+    if not api_key or "MY_" in api_key or "3aZ" in api_key:
         return None
     try:
-        url = "https://api.linkfinderai.com/v1/enrich/company"
+        # GetProspect Company Search API
+        url = "https://api.getprospect.com/public/v1/companies"
+        headers = {
+            "apiKey": api_key,
+            "Accept": "application/json"
+        }
+        params = {"domain": website}
         async with httpx.AsyncClient() as client:
-            res = await client.post(url, json={"domain": website}, headers={
-                "Authorization": f"Bearer {api_key}"
-            }, timeout=5.0)
-            data = res.json()
-            if data:
-                return {
-                    "employeeCountRange": data.get("employee_count_range") or "Unknown",
-                    "linkedInUrl": data.get("linkedin_url") or "",
-                    "industry": data.get("industry") or "",
-                    "foundedYear": data.get("founded_year")
-                }
+            res = await client.get(url, params=params, headers=headers, timeout=8.0)
+            if res.status_code == 200:
+                data = res.json()
+                # If it's a list/array of matches
+                if isinstance(data, list) and len(data) > 0:
+                    company = data[0]
+                elif data.get("data") and len(data["data"]) > 0:
+                    company = data["data"][0]
+                else:
+                    company = data
+
+                if company:
+                    return {
+                        "employeeCountRange": company.get("size") or company.get("employees") or "Unknown",
+                        "linkedInUrl": company.get("linkedinUrl") or company.get("linkedin") or "",
+                        "industry": company.get("industry") or "",
+                        "foundedYear": company.get("founded") or company.get("yearFounded")
+                    }
     except Exception as e:
-        print(f"[LinkFinder API] Error: {e}")
+        print(f"[GetProspect API] Error: {e}")
     return None
 
 
@@ -1108,7 +1138,9 @@ async def execute_adk_verification(
 
     solvency = clean_val(fin_obj.get("solvencyStatus"))
     credit = clean_val(fin_obj.get("creditScoreEst"))
-    is_regulated_or_subsidiary = any(keyword in str(corp_obj.get("legalStatus", "") + reg_obj.get("findings", "") + str(reg_obj.get("complianceLicenses", [])) + str(corp_obj.get("shareholders", []))).lower() for keyword in ["cbb", "central bank", "fca", "regulated", "license", "subsidiary", "benefit company"])
+    
+    # Strict fallback for financial institutions only, to avoid blowing away legitimate LLM revenue findings
+    is_regulated_or_subsidiary = any(keyword in str(corp_obj.get("legalStatus", "") + reg_obj.get("findings", "") + str(reg_obj.get("complianceLicenses", [])) + str(corp_obj.get("shareholders", []))).lower() for keyword in ["cbb", "central bank", "fca", "fdic", "sec regulated", "financial conduct authority", "benefit company"])
     
     if solvency == "Unable to verify" or credit == "Unable to verify":
         if is_regulated_or_subsidiary:
@@ -1239,8 +1271,8 @@ async def execute_adk_verification(
             "score": corp_obj.get("score") if corp_obj.get("score") is not None else 90,
             "status": corp_obj.get("status") or "success",
             "outputMessage": corp_obj.get("findings") or "Corporate status validation completed.",
-            "evidence": ["Filing checks completed"],
-            "keyFindings": [corp_obj.get("findings") or "Valid legal registry records matched."]
+            "evidence": corp_obj.get("evidenceRecords", ["Filing checks completed"]),
+            "keyFindings": corp_obj.get("coreAuditFindings", [corp_obj.get("findings") or "Valid legal registry records matched."])
         },
         "digital-agent": {
             "agentId": "digital-agent",
@@ -1248,8 +1280,8 @@ async def execute_adk_verification(
             "score": dig_obj.get("score") if dig_obj.get("score") is not None else 88,
             "status": dig_obj.get("status") or "success",
             "outputMessage": dig_obj.get("findings") or "Domain metadata resolved.",
-            "evidence": ["SSL active matches"],
-            "keyFindings": [dig_obj.get("findings") or "SSL cert verified secure."]
+            "evidence": dig_obj.get("evidenceRecords", ["SSL active matches"]),
+            "keyFindings": dig_obj.get("coreAuditFindings", [dig_obj.get("findings") or "SSL cert verified secure."])
         },
         "location-agent": {
             "agentId": "location-agent",
@@ -1257,8 +1289,8 @@ async def execute_adk_verification(
             "score": loc_obj.get("score") if loc_obj.get("score") is not None else 92,
             "status": loc_obj.get("status") or "success",
             "outputMessage": loc_obj.get("findings") or "Address search matching finished.",
-            "evidence": ["Google Places lookup maps"],
-            "keyFindings": [loc_obj.get("findings") or "Suitable commercial operations site."]
+            "evidence": loc_obj.get("evidenceRecords", ["Google Places lookup maps"]),
+            "keyFindings": loc_obj.get("coreAuditFindings", [loc_obj.get("findings") or "Suitable commercial operations site."])
         },
         "regulatory-agent": {
             "agentId": "regulatory-agent",
@@ -1266,8 +1298,8 @@ async def execute_adk_verification(
             "score": reg_obj.get("score") if reg_obj.get("score") is not None else 90,
             "status": reg_obj.get("status") or "success",
             "outputMessage": reg_obj.get("findings") or "Sanctions checking completed.",
-            "evidence": ["International sanctions scan list"],
-            "keyFindings": [reg_obj.get("findings") or "Zero sanctions database matches."]
+            "evidence": reg_obj.get("evidenceRecords", ["International sanctions scan list"]),
+            "keyFindings": reg_obj.get("coreAuditFindings", [reg_obj.get("findings") or "Zero sanctions database matches."])
         },
         "reputation-agent": {
             "agentId": "reputation-agent",
@@ -1275,8 +1307,8 @@ async def execute_adk_verification(
             "score": rep_obj.get("score") if rep_obj.get("score") is not None else 85,
             "status": rep_obj.get("status") or "success",
             "outputMessage": rep_obj.get("findings") or "Press and Sentinel scanning completed.",
-            "evidence": ["Adverse news indexing search"],
-            "keyFindings": [rep_obj.get("findings") or "Zero lawsuits or warnings detected."]
+            "evidence": rep_obj.get("evidenceRecords", ["Adverse news indexing search"]),
+            "keyFindings": rep_obj.get("coreAuditFindings", [rep_obj.get("findings") or "Zero lawsuits or warnings detected."])
         },
         "financial-agent": {
             "agentId": "financial-agent",
@@ -1284,8 +1316,8 @@ async def execute_adk_verification(
             "score": fin_obj.get("score") if fin_obj.get("score") is not None else 88,
             "status": fin_obj.get("status") or "success",
             "outputMessage": fin_obj.get("findings") or "Solvency profiles checks resolved.",
-            "evidence": ["Audited financial reports scan"],
-            "keyFindings": [fin_obj.get("findings") or "Verified financial solvency standing."]
+            "evidence": fin_obj.get("evidenceRecords", ["Audited financial reports scan"]),
+            "keyFindings": fin_obj.get("coreAuditFindings", [fin_obj.get("findings") or "Verified financial solvency standing."])
         },
         "risk-intelligence-agent": {
             "agentId": "risk-intelligence-agent",
@@ -1293,8 +1325,8 @@ async def execute_adk_verification(
             "score": risk_score,
             "status": "success" if rating == "GREEN" else ("warning" if rating == "AMBER" else ("danger" if rating == "RED" else "critical")),
             "outputMessage": exec_summary or "Comprehensive risk validation logs compiled.",
-            "evidence": ["Aggregated multi-agent consensus profiles"],
-            "keyFindings": [directive_rec or "Proceed with onboarding."]
+            "evidence": risk_obj.get("evidenceRecords", ["Aggregated multi-agent consensus profiles"]),
+            "keyFindings": risk_obj.get("coreAuditFindings", [directive_rec or "Proceed with onboarding."])
         }
     }
 
