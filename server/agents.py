@@ -214,6 +214,8 @@ regulatory_agent = Agent(
       * score 40-59: "danger"
       * score < 40: "critical"
     
+    STRICT NULL-FALLBACK FOR LICENSES: If you cannot find a specific regulatory license name (e.g., FCA, CBB, ISO certs, specific MOIC Trade License numbers), you MUST output "None verified" in the complianceLicenses array. NEVER list a legal corporate structure (like W.L.L., LLC, or Private Limited) as a license. Legal structures are NOT licenses.
+    
     STABILITY RULE: If you find verified positive evidence (confirmed directors, confirmed address, confirmed licence), anchor your score to that evidence. Do not lower your score below 70% simply because some details could not be found through search — absence of search results is not evidence of risk for an established entity.
 
     CRITICAL FORMATTING RULE: Keep the "findings" extremely short, concise, and up to the point (maximum 1-2 sentences). Do NOT write long paragraphs.
@@ -304,6 +306,10 @@ financial_agent = Agent(
       * score 60-79: "warning"
       * score 40-59: "danger"
       * score < 40: "critical"
+    
+    STRICT NULL-FALLBACK FOR FINANCIALS & CREDIT:
+    - If you cannot find official, verifiable financial filings (like MCA data) or reliable revenue figures, you MUST output "Unable to verify" for revenue, authorized capital, and paid-up capital. Do NOT invent or guess random numbers (e.g., 1,000 BHD or $38.7M).
+    - If you cannot find a specific, official Moody's, Fitch, or S&P credit rating, you MUST output "Not Available" for creditScoreEst. Do NOT invent proxies like "Good (regulated status)" or "Inferred". Empty, truthful fields are required for enterprise audits.
     
     STABILITY RULE: If you find verified positive evidence (confirmed directors, confirmed address, confirmed licence), anchor your score to that evidence. Do not lower your score below 70% simply because some details could not be found through search — absence of search results is not evidence of risk for an established entity.
 
