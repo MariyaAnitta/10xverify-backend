@@ -484,7 +484,7 @@ async def query_linkfinder(website: str):
         return None
     try:
         # GetProspect Company Search API (Search companies)
-        url = "https://api.getprospect.com/api/v1/insights/companies/search"
+        url = "https://api.getprospect.com/public/v1/insights/companies"
         headers = {
             "apiKey": api_key,
             "Content-Type": "application/json",
@@ -493,10 +493,9 @@ async def query_linkfinder(website: str):
         
         # Searching by company domain
         payload = {
-            "filters": {
-                "domains": [website]
-            },
-            "limit": 1
+            "domain": {
+                "included": [website]
+            }
         }
         
         print(f"[GetProspect API] Requesting data for {website} via POST...")
