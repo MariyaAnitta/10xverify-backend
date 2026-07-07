@@ -480,6 +480,7 @@ async def query_linkfinder(website: str):
     # Updated to use GetProspect API
     api_key = os.getenv("GETPROSPECT_API_KEY") or os.getenv("LINKFINDER_API_KEY")
     if not api_key or "MY_" in api_key or "3aZ" in api_key:
+        print("[GetProspect API] Skipping: No valid API key found.")
         return None
     try:
         # GetProspect Company Search API
@@ -489,8 +490,11 @@ async def query_linkfinder(website: str):
             "Accept": "application/json"
         }
         params = {"domain": website}
+        print(f"[GetProspect API] Requesting data for {website}...")
         async with httpx.AsyncClient() as client:
             res = await client.get(url, params=params, headers=headers, timeout=8.0)
+            print(f"[GetProspect API] Response Status: {res.status_code}")
+            
             if res.status_code == 200:
                 data = res.json()
                 # If it's a list/array of matches
@@ -508,8 +512,10 @@ async def query_linkfinder(website: str):
                         "industry": company.get("industry") or "",
                         "foundedYear": company.get("founded") or company.get("yearFounded")
                     }
+            else:
+                print(f"[GetProspect API] Error Body: {res.text}")
     except Exception as e:
-        print(f"[GetProspect API] Error: {e}")
+        print(f"[GetProspect API] Exception: {e}")
     return None
 
 
