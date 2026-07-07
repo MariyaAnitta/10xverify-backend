@@ -45,7 +45,10 @@ corporate_agent = Agent(
     
     STRICT LEGAL ENTITY RESOLUTION: You must strictly differentiate between a parent Holding Company and its operating subsidiaries. Identify the exact legal status of the specific subsidiary being queried. Furthermore, you MUST preserve the exact legal suffix as found in public records (e.g., 'W.L.L.', 'B.S.C. (Closed)', 'B.S.C. (c)'). Do not generalize or remove bracketed legal qualifiers.
 
-    CRITICAL RULE: If any of the required attributes (e.g. registrationNumber, incorporationDate, directors, legalStatus, registeredAddress) cannot be verified, are missing, or are not found in the ground-truth API data or tools, you MUST return "Unable to verify" (or a list containing "Unable to verify" for directors/shareholders) for that field. Do NOT guess or hallucinate any details.
+    CRITICAL RULE FOR REGISTRY DATA (STRICT NULL-FALLBACK): 
+    - If any of the required attributes (e.g. registrationNumber, incorporationDate, directors, legalStatus, registeredAddress) cannot be verified, are missing, or are not definitively linked to the target entity in the search results, you MUST return "Unable to verify" (or a list containing "Unable to verify" for directors/shareholders) for that field.
+    - Do NOT guess or hallucinate any details.
+    - Do NOT scrape a registration number from a generic business directory page unless it explicitly states it belongs to the target company name. It is common for directories to list multiple companies; do not accidentally steal the registration number of an unrelated company!
     
     ENTITY-DISAMBIGUATION MATCH CONFIDENCE:
     - Evaluate the match quality between the search query/target company and the chosen registry candidate (comparing name similarity, website, industry, and geography).
