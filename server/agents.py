@@ -483,27 +483,36 @@ async def query_linkfinder(website: str):
         print("[GetProspect API] Skipping: No valid API key found.")
         return None
     try:
-        # GetProspect Company Search API
-        url = "https://api.getprospect.com/public/v1/companies"
+        # GetProspect Company Search API (Search companies)
+        url = "https://api.getprospect.com/api/v1/insights/companies/search"
         headers = {
             "apiKey": api_key,
+            "Content-Type": "application/json",
             "Accept": "application/json"
         }
-        params = {"domain": website}
-        print(f"[GetProspect API] Requesting data for {website}...")
+        
+        # Searching by company domain
+        payload = {
+            "filters": {
+                "domains": [website]
+            },
+            "limit": 1
+        }
+        
+        print(f"[GetProspect API] Requesting data for {website} via POST...")
         async with httpx.AsyncClient() as client:
-            res = await client.get(url, params=params, headers=headers, timeout=8.0)
+            res = await client.post(url, json=payload, headers=headers, timeout=8.0)
             print(f"[GetProspect API] Response Status: {res.status_code}")
             
             if res.status_code == 200:
                 data = res.json()
-                # If it's a list/array of matches
-                if isinstance(data, list) and len(data) > 0:
-                    company = data[0]
-                elif data.get("data") and len(data["data"]) > 0:
+                company = None
+                
+                # Extract first hit from the results array
+                if data.get("data") and len(data["data"]) > 0:
                     company = data["data"][0]
-                else:
-                    company = data
+                elif isinstance(data, list) and len(data) > 0:
+                    company = data[0]
 
                 if company:
                     return {
