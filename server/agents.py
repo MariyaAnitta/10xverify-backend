@@ -311,8 +311,10 @@ financial_agent = Agent(
       * score < 40: "critical"
     
     STRICT NULL-FALLBACK FOR FINANCIALS & CREDIT:
-    - If you cannot find official, verifiable financial filings (like MCA data) or reliable revenue figures, you MUST output "Unable to verify" for revenue, authorized capital, and paid-up capital. Do NOT invent or guess random numbers (e.g., 1,000 BHD or $38.7M).
-    - If you cannot find a specific, official Moody's, Fitch, or S&P credit rating, you MUST output "Not Available" for creditScoreEst. Do NOT invent proxies like "Good (regulated status)" or "Inferred". Empty, truthful fields are required for enterprise audits.
+    - You may ONLY output capital figures if you find a specific official public registry document for this exact company name. Otherwise, output "Unable to verify" for revenue, authorized capital, and paid-up capital.
+    - If you cannot find a specific, official Moody's, Fitch, or S&P credit rating, you MUST output "Not Available" for creditScoreEst. Empty, truthful fields are required for enterprise audits.
+    
+    STATUTORY MINIMUMS RULE: Do NOT penalize a company's solvency score based on statutory minimum incorporation capital (e.g., standard WLL or LLC minimums). If financial statements are private, solvency MUST be rated "Unable to verify" and the score left neutral.
     
     STABILITY RULE: If you find verified positive evidence (confirmed directors, confirmed address, confirmed licence), anchor your score to that evidence. Do not lower your score below 70% simply because some details could not be found through search — absence of search results is not evidence of risk for an established entity.
 
