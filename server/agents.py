@@ -1121,8 +1121,14 @@ async def execute_adk_verification(
             return fallback
         cleaned = []
         for v in val:
-            if v and str(v).strip().lower() not in ["", "none", "null", "undefined", "unable to verify", "jane doe", "john smith", "direct founders / corporate stock"]:
-                cleaned.append(v)
+            if isinstance(v, list):
+                # Flatten nested arrays which Firestore rejects
+                for sub_v in v:
+                    if sub_v and str(sub_v).strip().lower() not in ["", "none", "null", "undefined", "unable to verify", "jane doe", "john smith"]:
+                        cleaned.append(str(sub_v).strip())
+            else:
+                if v and str(v).strip().lower() not in ["", "none", "null", "undefined", "unable to verify", "jane doe", "john smith", "direct founders / corporate stock"]:
+                    cleaned.append(str(v).strip())
         return cleaned if cleaned else fallback
 
     # Apply strict validation checks and adjust scores/findings in place
@@ -1283,10 +1289,12 @@ async def execute_adk_verification(
         "domainAgeDays": whois_data.get("domainAgeDays") if whois_data else None,
         "domainRegistrar": clean_val(whois_data.get("registrar") if whois_data else None),
         "sslSecure": whois_data.get("sslSecure") if whois_data and whois_data.get("sslSecure") is not None else False,
-        "socialLinks": list(filter(None, [
-            link_finder_data["linkedInUrl"] if link_finder_data and link_finder_data.get("linkedInUrl") else None,
-            github_data["githubUrl"] if github_data and github_data.get("githubUrl") else None
-        ])),
+        "socialLinks": [
+            str(url) for url in filter(None, [
+                link_finder_data.get("linkedInUrl") if link_finder_data else None,
+                github_data.get("githubUrl") if github_data else None
+            ]) if isinstance(url, str)
+        ],
         "complianceLicenses": clean_list(reg_obj.get("complianceLicenses")),
         "sanctionsRisk": clean_val(reg_obj.get("sanctionsRisk"), fallback="None"),
         "solvencyStatus": clean_val(fin_obj.get("solvencyStatus"), fallback="Unable to verify"),
