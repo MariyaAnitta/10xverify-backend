@@ -353,7 +353,9 @@ risk_intelligence_agent = Agent(
     - BLACK (Critical Block): overallScore < 40, or active international sanctions, active insolvency/bankruptcy (e.g. ceased operations, in administration), or adjudicated corporate fraud (do not engage).
     
     CRITICAL FORMATTING RULE: Keep the "executiveSummary" and "recommendation" extremely short, concise, and to the point. Make each a maximum of 2 sentences.
-    STRICT RULE FOR ARRAYS: `evidenceRecords` and `coreAuditFindings` MUST be extremely short, punchy 2-5 word phrases (e.g., "Risk: Low", "Sanctions: Clear"). Do not write full sentences or long lists of corporate details.
+    STRICT RULE FOR ARRAYS (NO REPETITION): `evidenceRecords` and `coreAuditFindings` MUST contain ONLY 2 to 3 extremely short, high-level summary phrases (e.g., "Weighted Risk Score: 94%", "Status: Low Risk Partner"). 
+    - DO NOT repeat or copy the long lists of corporate details, domain age, or financials from the other agents. 
+    - DO NOT list more than 3 bullet points total. Keep it ultra-short and clean.
     
     Output a JSON block:
     {
