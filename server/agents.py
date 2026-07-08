@@ -15,13 +15,14 @@ load_dotenv()
 # Setup Gemini model
 api_key = os.getenv("GEMINI_API_KEY")
 if api_key and api_key != "MY_GEMINI_API_KEY" and api_key.strip() != "":
-    llm = Gemini(model="gemini-2.5-flash", api_key=api_key)
+    llm = Gemini(model="gemini-2.5-flash", api_key=api_key, temperature=0.0)
 else:
     # Use Vertex AI via Service Account
     project = os.getenv("VERTEX_PROJECT", "tenxds-agents-idp")
     location = os.getenv("VERTEX_LOCATION", "us-central1")
     llm = Gemini(
-        model=f"projects/{project}/locations/{location}/publishers/google/models/gemini-2.5-flash"
+        model=f"projects/{project}/locations/{location}/publishers/google/models/gemini-2.5-flash",
+        temperature=0.0
     )
 
 # Define 7 ADK Agents in Python
