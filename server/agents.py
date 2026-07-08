@@ -15,14 +15,14 @@ load_dotenv()
 # Setup Gemini model
 api_key = os.getenv("GEMINI_API_KEY")
 if api_key and api_key != "MY_GEMINI_API_KEY" and api_key.strip() != "":
-    llm = Gemini(model="gemini-2.5-flash", api_key=api_key, temperature=0.0)
+    llm = Gemini(model="gemini-2.5-flash", api_key=api_key, temperature=0.3)
 else:
     # Use Vertex AI via Service Account
     project = os.getenv("VERTEX_PROJECT", "tenxds-agents-idp")
     location = os.getenv("VERTEX_LOCATION", "us-central1")
     llm = Gemini(
         model=f"projects/{project}/locations/{location}/publishers/google/models/gemini-2.5-flash",
-        temperature=0.0
+        temperature=0.3
     )
 
 # Define 7 ADK Agents in Python
@@ -1186,22 +1186,7 @@ async def execute_adk_verification(
     solvency = clean_val(fin_obj.get("solvencyStatus"))
     credit = clean_val(fin_obj.get("creditScoreEst"))
     
-    # Strict fallback for financial institutions only, to avoid blowing away legitimate LLM revenue findings
-    is_regulated_or_subsidiary = any(keyword in str(corp_obj.get("legalStatus", "") + reg_obj.get("findings", "") + str(reg_obj.get("complianceLicenses", [])) + str(corp_obj.get("shareholders", []))).lower() for keyword in ["cbb", "central bank", "fca", "fdic", "sec regulated", "financial conduct authority", "benefit company"])
-    
-    if solvency == "Unable to verify" or credit == "Unable to verify":
-        if is_regulated_or_subsidiary:
-            fin_obj["score"] = 75
-            fin_obj["status"] = "success"
-            fin_obj["findings"] = "Solvency and standing are inferred via regulatory licensing oversight and parent standing."
-            fin_obj["solvencyStatus"] = "Solvent (inferred)"
-            fin_obj["creditScoreEst"] = "Good (regulated status)"
-        else:
-            fin_obj["score"] = 45
-            fin_obj["status"] = "warning"
-            fin_obj["findings"] = "Solvency and credit rating cannot be verified due to lack of public financial filings."
-            fin_obj["solvencyStatus"] = "Unable to verify"
-            fin_obj["creditScoreEst"] = "Unable to verify"
+    # Removed hardcoded financial override to strictly respect the LLM's 'Unable to verify' logic.
 
     # Mismatch check between official company website and email domain
     official_web = clean_val(corp_obj.get("website"), fallback=None)
