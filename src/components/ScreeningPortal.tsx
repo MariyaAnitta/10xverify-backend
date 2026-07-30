@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "motion/react";
 
 interface ScreeningPortalProps {
   onScreeningComplete: (newVendor: VendorScreening) => void;
+  autoStartVendor?: any;
 }
 
 const STAGES = [
@@ -17,7 +18,7 @@ const STAGES = [
   { id: "risk", name: "Risk Intelligence Agent", icon: Cpu, log: "Consolidating risk intelligence..." }
 ];
 
-export default function ScreeningPortal({ onScreeningComplete }: ScreeningPortalProps) {
+export default function ScreeningPortal({ onScreeningComplete, autoStartVendor }: ScreeningPortalProps) {
   const [companyName, setCompanyName] = useState("");
   const [website, setWebsite] = useState("");
   const [country, setCountry] = useState("United States");
@@ -25,6 +26,11 @@ export default function ScreeningPortal({ onScreeningComplete }: ScreeningPortal
   const [industry, setIndustry] = useState("Healthcare");
   const [customIndustry, setCustomIndustry] = useState("");
   const [screenedBy, setScreenedBy] = useState("M. Anitta");
+  
+  const [email, setEmail] = useState("");
+  const [financials, setFinancials] = useState<any>(null);
+
+  const [hasAutoStarted, setHasAutoStarted] = useState(false);
 
   const [isRunning, setIsRunning] = useState(false);
   const [currentStageIndex, setCurrentStageIndex] = useState(0);
@@ -44,6 +50,31 @@ export default function ScreeningPortal({ onScreeningComplete }: ScreeningPortal
     "Manufacturing", "Investment Firms", "Technology",
     "Other (Write-in)"
   ];
+
+  // Auto-start if triggered from Vendor Queue
+  useEffect(() => {
+    if (autoStartVendor && !hasAutoStarted) {
+      setCompanyName(autoStartVendor.companyName || "");
+      setWebsite(autoStartVendor.website || "");
+      setEmail(autoStartVendor.contactEmail || autoStartVendor.email || "");
+      setFinancials(autoStartVendor.financials || null);
+      
+      const c = countries.includes(autoStartVendor.country) ? autoStartVendor.country : "Other (Write-in)";
+      setCountry(c);
+      if (c === "Other (Write-in)") setCustomCountry(autoStartVendor.country);
+
+      const i = industries.includes(autoStartVendor.industry) ? autoStartVendor.industry : "Other (Write-in)";
+      setIndustry(i);
+      if (i === "Other (Write-in)") setCustomIndustry(autoStartVendor.industry);
+
+      setHasAutoStarted(true);
+      setErrorMessage("");
+      setIsRunning(true);
+      setIsFinalizing(false);
+      setCurrentStageIndex(0);
+      setTickerLogs([`[SYSTEM] Digital workforce auto-initiated from Admin Queue for ${autoStartVendor.companyName}.`]);
+    }
+  }, [autoStartVendor, hasAutoStarted, countries, industries]);
 
   // Simulates ticker logs running in the background for active agent
   useEffect(() => {
@@ -174,7 +205,9 @@ export default function ScreeningPortal({ onScreeningComplete }: ScreeningPortal
           website,
           country: finalCountry,
           industry: finalIndustry,
-          screenedBy
+          screenedBy,
+          email: email || undefined,
+          financials: financials || undefined
         })
       });
 
@@ -192,6 +225,8 @@ export default function ScreeningPortal({ onScreeningComplete }: ScreeningPortal
       setWebsite("");
       setCustomCountry("");
       setCustomIndustry("");
+      setEmail("");
+      setFinancials(null);
     } catch (err: any) {
       console.error(err);
       setErrorMessage(err.message || "Something went wrong during agent orchestration.");

@@ -1,0 +1,61 @@
+10xVerify.AI - Required Changes & Enterprise Transformation Roadmap
+====================================================================
+
+This document consolidates all pending tasks, missing MVP requirements, and the manager's feedback to transform the platform into an enterprise-grade AI Due Diligence tool.
+
+--------------------------------------------------------------------
+PART 1: ENTERPRISE TRANSFORMATION REQUIREMENTS (MANAGER FEEDBACK)
+--------------------------------------------------------------------
+
+1. Multidimensional Risk Scoring
+   - Replace the single Risk Score with category-based weighted scoring (e.g., Corporate Identity, Financial Health, Regulatory Compliance, Digital Trust, Cyber Hygiene, Reputation, Operational Presence, Litigation).
+   - Calculate an Overall Risk Score based on these sub-categories.
+
+2. Confidence Scoring & Explainability
+   - Add a Confidence Score (e.g., 72%) to every risk assessment and sub-category.
+   - Explain WHY risk exists (e.g., "High Risk because Corporate registration not independently verified").
+   - Add an AI Explainability Agent to document evidence collected, reasoning, confidence, cross-checks, conflicts, and hallucination risks.
+
+3. Evidence Repository & Traceability
+   - Stop using "Unable to verify". Use "Unable to verify through publicly available sources".
+   - Every finding must have specific Evidence attached: Source, Timestamp, Search Query, Response API/Payload, and a Screenshot.
+   - Implement rigorous cloud storage (e.g., AWS S3 or GCP Cloud Storage) to store evidence screenshots and raw API dumps for deep auditability.
+
+4. Executive Summary & Dashboard Overhaul
+   - The dashboard must show: Overall Risk, Score, Confidence Level, Evidence Sources Used, Evidence Coverage %, and a Risk Heat Map.
+   - Implement a Visual Timeline (Founded -> Website Created -> First News -> Funding -> Litigation).
+   - Implement a Professional Risk Matrix mapping Severity vs. Likelihood (P1 to P4).
+
+5. Expansion of AI Agent Ecosystem (to 25+ Agents)
+   - Expand Corporate: UBO Agent, Director Intelligence, Company Registry.
+   - Expand Financial: Credit estimate, Bankruptcy, Debt indicators.
+   - Expand Compliance: PEP, AML, Export Controls, ESG Agent (Sustainability, Labor).
+   - Expand Cyber: HTTPS, TLS Version, Cert Expiry, DNSSEC, SPF, DKIM, Hosting Country, Registrar.
+   - Expand Reputation: Social Intelligence, Customer Reviews, Litigation Agent.
+   - Expand Operations: Maps Agent, Supply Chain Agent.
+
+6. Enterprise Deliverables
+   - Generate an Executive Due Diligence Report (PDF), Board-Level Risk Summary, ESG & Compliance Report, and Cyber Trust Report.
+
+--------------------------------------------------------------------
+PART 2: PARTIALLY COMPLETED & MISSING MVP FEATURES
+--------------------------------------------------------------------
+
+1. Vendor Registration Portal
+   - Current State: Internal portal exists (`ScreeningPortal.tsx`) with a power-automate webhook.
+   - Missing: An external-facing vendor self-service portal where vendors can register themselves, input business details, and securely track status.
+
+2. Basic ERP Integration
+   - Current State: Leverages Microsoft Power Automate webhooks as middleware.
+   - Missing: Explicit, native API sync capabilities directly with an ERP like SAP Ariba, Dynamics 365, or Oracle (needs confirmation if native integration is strictly required over Power Automate).
+
+3. Document Collection & AI Document Intelligence (10xIDP)
+   - Missing: No robust document upload capability for PDFs/Images (Certificates of Incorporation, Trade Licenses, etc.).
+   - Missing: The 10xIDP OCR/Data Extraction pipeline is missing. The system currently relies on web searches instead of processing vendor-uploaded documents.
+
+4. Continuous Monitoring System
+   - Missing: No background daemon/worker periodically re-scanning approved vendors for new litigation, sanctions, or certificate expiries. Assessments are currently point-in-time.
+
+5. Missing Phase 1 Specialized Agents
+   - Missing: ESG Agent (Sustainability/Environmental checks).
+   - Missing: Litigation Agent (Court cases/Bankruptcy databases).

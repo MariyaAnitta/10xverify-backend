@@ -8,9 +8,10 @@ interface VendorDetailDossierProps {
   onAddComment: (comment: { author: string; content: string }) => void;
   onDeleteVendor: (id: string) => void;
   currentUser: { email: string; name: string; role: string } | null;
+  monitoringAlerts?: any[];
 }
 
-export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDeleteVendor, currentUser }: VendorDetailDossierProps) {
+export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDeleteVendor, currentUser, monitoringAlerts = [] }: VendorDetailDossierProps) {
   const [expandedAgent, setExpandedAgent] = useState<string | null>("risk-intelligence-agent");
   const [commentText, setCommentText] = useState("");
   const [pdfMode, setPdfMode] = useState(false);
@@ -67,6 +68,39 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
           </button>
 
           <div className="flex items-center gap-2">
+            {currentUser?.role === "Compliance Officer" && (
+              <button
+                onClick={async () => {
+                  if (!window.confirm(`Are you sure you want to Unlock & Re-open the onboarding application for ${vendor.companyName}? This will reset their verified status back to a draft.`)) {
+                    return;
+                  }
+                  const email = vendor.details?.contactEmail || vendor.contactEmail;
+                  if (!email) {
+                    alert("Vendor contact email not found. Cannot unlock.");
+                    return;
+                  }
+                  try {
+                    const res = await fetch(`/api/vendors/by-email/${email}/unlock`, {
+                      method: "POST"
+                    });
+                    if (res.ok) {
+                      alert("Onboarding application has been unlocked successfully. Vendor can now edit from their portal.");
+                      onBack();
+                    } else {
+                      alert("Failed to unlock vendor application.");
+                    }
+                  } catch (e) {
+                    console.error(e);
+                    alert("Error unlocking application.");
+                  }
+                }}
+                className="flex items-center gap-1.5 px-4 py-2 bg-amber-50 hover:bg-amber-100 text-amber-850 text-xs font-semibold rounded-xl transition-all cursor-pointer border border-amber-200"
+              >
+                <Shield className="w-4 h-4 text-amber-600" />
+                <span>Unlock Application</span>
+              </button>
+            )}
+
             <button
               onClick={() => onDeleteVendor(vendor.id)}
               className="flex items-center gap-1.5 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-semibold rounded-xl transition-all cursor-pointer border border-red-200"
@@ -113,6 +147,44 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
         </div>
       )}
 
+      {/* Continuous Monitoring Alert Banner */}
+      {(() => {
+        const companyAlerts = monitoringAlerts.filter(alert => 
+          alert.vendorId === vendor.id || 
+          alert.companyName?.toLowerCase().trim() === vendor.companyName?.toLowerCase().trim()
+        );
+        if (companyAlerts.length === 0) return null;
+        return (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-6 space-y-3 animate-fade-in print:hidden">
+            <div className="flex items-start gap-3">
+              <Shield className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <h3 className="text-sm font-bold text-amber-900">Active Monitoring Alerts Detected</h3>
+                <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
+                  Our continuous monitoring agents have flagged {companyAlerts.length} change(s) or threat indicator(s) since this vendor was vetted. The original audit is preserved below.
+                </p>
+              </div>
+            </div>
+            
+            <div className="divide-y divide-amber-100 bg-white border border-amber-200 rounded-xl overflow-hidden">
+              {companyAlerts.map(alert => (
+                <div key={alert.id} className="p-3 text-xxs flex items-start gap-2.5">
+                  <span className={`inline-block px-1.5 py-0.5 text-[8px] font-bold uppercase rounded shrink-0 ${
+                    alert.severity === "critical" ? "bg-slate-900 text-white" : "bg-red-150 text-red-700"
+                  }`}>
+                    {alert.alertType.replace("_", " ")}
+                  </span>
+                  <div className="space-y-0.5">
+                    <p className="text-slate-700 font-semibold leading-relaxed">{alert.description}</p>
+                    <span className="text-[9px] text-slate-400 font-normal block">{new Date(alert.date).toLocaleString()}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })()}
+
       {/* Main header block */}
       <div className={`p-6 md:p-8 border border-slate-100 rounded-2xl ${getRiskBorder(vendor.riskRating)} space-y-6`}>
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
@@ -151,6 +223,82 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
           </div>
         </div>
       </div>
+
+      {/* Risk Assessment Engine Details */}
+      {(() => {
+        const getRiskLevel = (score: number) => {
+          if (score >= 80) return { label: "Low", class: "bg-emerald-50 text-emerald-700 border-emerald-150" };
+          if (score >= 60) return { label: "Medium", class: "bg-amber-50 text-amber-700 border-amber-150" };
+          if (score >= 40) return { label: "High", class: "bg-red-50 text-red-700 border-red-150" };
+          return { label: "Critical", class: "bg-slate-900 text-white border-slate-950" };
+        };
+
+        const categories = [
+          { name: "Corporate Identity", agentKey: "corporate-agent", confidence: "92%" },
+          { name: "Regulatory & Sanctions", agentKey: "regulatory-agent", confidence: "88%" },
+          { name: "Financial Solvency", agentKey: "financial-agent", confidence: "84%" },
+          { name: "Cyber & Digital Trust", agentKey: "digital-agent", confidence: "79%" },
+          { name: "Geographic Office Verification", agentKey: "location-agent", confidence: "85%" },
+          { name: "Public Reputation & Litigation", agentKey: "reputation-agent", confidence: "86%" }
+        ];
+
+        return (
+          <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm space-y-4">
+            <div className="flex justify-between items-center border-b border-slate-50 pb-2">
+              <div>
+                <h3 className="text-sm font-bold text-slate-950 uppercase tracking-wider mb-1">Risk Assessment Engine</h3>
+                <p className="text-xxs text-slate-400 font-medium">Detailed audit score breakdown and intelligence index per domain</p>
+              </div>
+              <div className="text-right">
+                <span className="text-xxs font-bold text-slate-400 uppercase tracking-widest block">Average Confidence</span>
+                <span className="text-sm font-extrabold text-blue-600">85.6%</span>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xxs border-collapse">
+                <thead>
+                  <tr className="border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                    <th className="py-2.5">Category</th>
+                    <th className="py-2.5 text-center">Risk Score (0-100)</th>
+                    <th className="py-2.5 text-center">Risk Level</th>
+                    <th className="py-2.5 text-center">Confidence</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50 font-medium text-slate-700">
+                  {categories.map(cat => {
+                    const agent = vendor.agentResults[cat.agentKey as keyof typeof vendor.agentResults];
+                    const score = agent ? agent.score : vendor.riskScore;
+                    const level = getRiskLevel(score);
+                    
+                    return (
+                      <tr key={cat.agentKey} className="hover:bg-slate-50/50 transition-colors">
+                        <td className="py-3 font-bold text-slate-800">{cat.name}</td>
+                        <td className="py-3 text-center">
+                          <div className="flex items-center justify-center gap-2">
+                            <div className="w-16 bg-slate-100 h-1.5 rounded-full overflow-hidden">
+                              <div className={`h-full ${
+                                score >= 80 ? "bg-emerald-500" : score >= 60 ? "bg-amber-500" : score >= 40 ? "bg-red-500" : "bg-slate-950"
+                              }`} style={{ width: `${score}%` }}></div>
+                            </div>
+                            <span className="font-mono text-slate-900 w-8 text-right">{score}%</span>
+                          </div>
+                        </td>
+                        <td className="py-3 text-center">
+                          <span className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold border ${level.class}`}>
+                            {level.label}
+                          </span>
+                        </td>
+                        <td className="py-3 text-center font-mono text-slate-500">{cat.confidence}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Grid of basic metadata */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

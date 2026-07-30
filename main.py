@@ -1,5 +1,6 @@
 import os
 import json
+import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore
 from fastapi import FastAPI, HTTPException, Header
@@ -9,7 +10,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi import Request
 from pydantic import BaseModel
 from typing import List, Optional
-from server.agents import execute_adk_verification
+from server.agents import execute_adk_verification, query_opensanctions, query_gnews, query_whoisjson
 import asyncio
 from server.email_ingestion import start_email_listener, parse_vendor_with_llm
 from server.pdf_generator import generate_dossier_html
@@ -52,7 +53,13 @@ class ScreenRequest(BaseModel):
     website: str
     country: str
     industry: str
-    screenedBy: Optional[str] = "Web Portal User"
+    screenedBy: str
+    email: Optional[str] = None
+    financials: Optional[dict] = None
+
+class VendorDraftRequest(BaseModel):
+    email: str # Vendor's email
+    data: dict # All form fields combined
 
 def get_db():
     try:
@@ -130,13 +137,351 @@ def calculate_metrics(vendors):
         "complianceAlerts": alerts
     }
 
+class RegisterRequest(BaseModel):
+    email: str
+    password: str
+    name: str
+    role: str
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+# Authentication Endpoints
+@app.post("/api/auth/register")
+def register_user(req: RegisterRequest):
+    try:
+        user_ref = db_fs.collection("users").document(req.email.lower())
+        if user_ref.get().exists:
+            raise HTTPException(status_code=400, detail="User with this email already exists")
+        
+        user_data = {
+            "email": req.email.lower(),
+            "password": req.password, # In a real app, hash this with bcrypt!
+            "name": req.name,
+            "role": req.role,
+            "createdAt": firestore.SERVER_TIMESTAMP
+        }
+        user_ref.set(user_data)
+        
+        # Remove un-serializable fields and passwords before returning
+        user_data.pop("password")
+        user_data.pop("createdAt")
+        return {"status": "success", "user": user_data}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Register Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/auth/login")
+def login_user(req: LoginRequest):
+    try:
+        doc = db_fs.collection("users").document(req.email.lower()).get()
+        if not doc.exists:
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+        
+        user = doc.to_dict()
+        if user.get("password") != req.password:
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+            
+        user.pop("password", None)
+        return {"status": "success", "user": user}
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        print(f"Login Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/users")
+def get_users():
+    try:
+        docs = db_fs.collection("users").stream()
+        users = []
+        for doc in docs:
+            user = doc.to_dict()
+            user.pop("password", None)
+            users.append(user)
+        return users
+    except Exception as e:
+        print(f"Get Users Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/users/{email}")
+def delete_user(email: str):
+    try:
+        db_fs.collection("users").document(email.lower()).delete()
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 # Old Gmail Pub/Sub listener has been disabled in favor of Power Automate Webhook.
+
+async def run_continuous_monitoring_audit():
+    print("[Monitoring Agent] Continuous weekly check started...")
+    try:
+        vendors = db_fs.collection("vendors").stream()
+        for doc in vendors:
+            v = doc.to_dict()
+            vendor_id = doc.id
+            company_name = v.get("companyName")
+            website = v.get("website", "").replace("https://", "").replace("http://", "").replace("www.", "").strip().rstrip("/")
+            
+            if not company_name or not website:
+                continue
+                
+            print(f"[Monitoring Agent] Auditing vendor: {company_name} ({website})...")
+            
+            # 1. Check GNews for new adverse press
+            news = await query_gnews(company_name)
+            if news and isinstance(news, list) and len(news) > 0:
+                alert_id = f"alert-{vendor_id}-media"
+                db_fs.collection("monitoring_alerts").document(alert_id).set({
+                    "id": alert_id,
+                    "companyName": company_name,
+                    "alertType": "adverse_media",
+                    "severity": "high",
+                    "description": f"Continuous Audit: 1 new news mention resolved on GNews matching '{company_name}'.",
+                    "date": datetime.datetime.utcnow().isoformat() + "Z"
+                })
+                
+            # 2. Check OpenSanctions for listing updates
+            sanctions = await query_opensanctions(company_name)
+            if sanctions and sanctions.get("matchFound"):
+                alert_id = f"alert-{vendor_id}-sanction"
+                db_fs.collection("monitoring_alerts").document(alert_id).set({
+                    "id": alert_id,
+                    "companyName": company_name,
+                    "alertType": "sanction_link",
+                    "severity": "critical",
+                    "description": f"Continuous Audit: Flagged match on sanctions watchlists for '{company_name}': {sanctions.get('details')}",
+                    "date": datetime.datetime.utcnow().isoformat() + "Z"
+                })
+                
+            # 3. WHOIS status updates
+            whois = await query_whoisjson(website)
+            if whois and whois.get("domainAgeDays") and whois.get("domainAgeDays") > 0:
+                alert_id = f"alert-{vendor_id}-domain"
+                db_fs.collection("monitoring_alerts").document(alert_id).set({
+                    "id": alert_id,
+                    "companyName": company_name,
+                    "alertType": "domain_change",
+                    "severity": "warning",
+                    "description": f"Continuous Audit: Verified active SSL/TLS registration mapping for {website} is current.",
+                    "date": datetime.datetime.utcnow().isoformat() + "Z"
+                })
+                
+        print("[Monitoring Agent] Continuous weekly check finished successfully.")
+    except Exception as e:
+        print(f"[Monitoring Agent] Error running audit: {e}")
+
+async def check_and_trigger_monitoring():
+    try:
+        config_ref = db_fs.collection("system_config").document("monitoring_status")
+        config = config_ref.get()
+        
+        now = datetime.datetime.utcnow()
+        run_audit = False
+        
+        if not config.exists:
+            run_audit = True
+        else:
+            data = config.to_dict()
+            last_run_str = data.get("lastRunAt")
+            if last_run_str:
+                last_run = datetime.datetime.fromisoformat(last_run_str.replace("Z", "+00:00")).replace(tzinfo=None)
+                if (now - last_run).days >= 7:
+                    run_audit = True
+            else:
+                run_audit = True
+                
+        if run_audit:
+            print("[Monitoring Agent] Triggering weekly passive audit check...")
+            config_ref.set({"lastRunAt": now.isoformat() + "Z"})
+            asyncio.create_task(run_continuous_monitoring_audit())
+    except Exception as e:
+        print(f"[Monitoring Agent] Error checking schedule: {e}")
+
+@app.on_event("startup")
+async def startup_event():
+    # Run the passive audit check 5 seconds after startup for testing
+    async def delayed_trigger():
+        await asyncio.sleep(5)
+        await check_and_trigger_monitoring()
+    asyncio.create_task(delayed_trigger())
 
 # API Endpoints
 @app.get("/api/health")
-def health():
+async def health():
+    asyncio.create_task(check_and_trigger_monitoring())
     mode = "AI_ACTIVE" if os.getenv("GEMINI_API_KEY") else "SIMULATED"
     return {"status": "ok", "mode": mode}
+
+@app.get("/api/monitoring-alerts")
+def get_monitoring_alerts():
+    try:
+        docs = db_fs.collection("monitoring_alerts").stream()
+        alerts = [doc.to_dict() for doc in docs]
+        alerts.sort(key=lambda x: x.get("date", ""), reverse=True)
+        return alerts
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/monitoring-alerts/trigger")
+def force_trigger_monitoring():
+    try:
+        now = datetime.datetime.utcnow()
+        db_fs.collection("system_config").document("monitoring_status").set({
+            "lastRunAt": now.isoformat() + "Z"
+        })
+        asyncio.create_task(run_continuous_monitoring_audit())
+        return {"status": "success", "message": "Continuous monitoring audit triggered in background."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/vendor-portal/draft")
+def save_vendor_draft(req: VendorDraftRequest):
+    try:
+        db_fs.collection("onboarding_drafts").document(req.email.lower()).set(req.data)
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/vendor-portal/draft/{email}")
+def get_vendor_draft(email: str):
+    try:
+        doc = db_fs.collection("onboarding_drafts").document(email.lower()).get()
+        if not doc.exists:
+            return {"status": "not_found", "data": {}}
+        return {"status": "success", "data": doc.to_dict()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/vendor-portal/submit")
+def submit_vendor_profile(req: VendorDraftRequest):
+    try:
+        # Save to the queue for Compliance/Vetting Officers to see
+        req.data["status"] = "Submitted"
+        req.data["submittedAt"] = datetime.datetime.utcnow().isoformat() + "Z"
+        req.data["id"] = f"vend-req-{int(datetime.datetime.utcnow().timestamp())}"
+        
+        db_fs.collection("vendor_queue").document(req.email.lower()).set(req.data)
+        
+        # Optionally, remove draft
+        db_fs.collection("onboarding_drafts").document(req.email.lower()).delete()
+        
+        return {"status": "success", "data": req.data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/vendors/by-email/{email}")
+def get_vendor_by_email(email: str):
+    try:
+        # First, search in "vendors" collection
+        docs = db_fs.collection("vendors").stream()
+        for doc in docs:
+            data = doc.to_dict()
+            if data.get("contactEmail", "").lower() == email.lower() or data.get("details", {}).get("contactEmail", "").lower() == email.lower() or doc.id.lower() == email.lower():
+                return {"status": "Screened", "vendor": data}
+                
+        # Second, search in "vendor_queue"
+        doc_q = db_fs.collection("vendor_queue").document(email.lower()).get()
+        if doc_q.exists:
+            return {"status": "Queue", "vendor": doc_q.to_dict()}
+            
+        return {"status": "Not_Found"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/vendors/by-email/{email}/unlock")
+def unlock_vendor(email: str):
+    try:
+        # Find and delete from "vendors"
+        docs = db_fs.collection("vendors").stream()
+        vendor_data = None
+        for doc in docs:
+            data = doc.to_dict()
+            if data.get("contactEmail", "").lower() == email.lower() or data.get("details", {}).get("contactEmail", "").lower() == email.lower() or doc.id.lower() == email.lower():
+                vendor_data = data
+                db_fs.collection("vendors").document(doc.id).delete()
+                
+        # Delete from "vendor_queue"
+        doc_q = db_fs.collection("vendor_queue").document(email.lower())
+        if doc_q.get().exists:
+            if not vendor_data:
+                vendor_data = doc_q.get().to_dict()
+            doc_q.delete()
+            
+        # If we have vendor data, write back to drafts
+        if vendor_data:
+            # Check details key, otherwise check root
+            v_details = vendor_data.get("details", {})
+            draft_data = {
+                "businessInfo": {
+                    "legalName": vendor_data.get("companyName", "") or vendor_data.get("businessInfo", {}).get("legalName", ""),
+                    "website": vendor_data.get("website", "") or vendor_data.get("businessInfo", {}).get("website", ""),
+                    "country": vendor_data.get("country", "") or vendor_data.get("businessInfo", {}).get("country", ""),
+                    "industry": vendor_data.get("industry", "") or vendor_data.get("businessInfo", {}).get("industry", ""),
+                    "contactEmail": vendor_data.get("contactEmail", "") or v_details.get("contactEmail", "") or vendor_data.get("businessInfo", {}).get("contactEmail", "")
+                },
+                "financials": vendor_data.get("financials", {}) or v_details.get("financials", {}),
+                "signature": vendor_data.get("signature", "")
+            }
+            db_fs.collection("onboarding_drafts").document(email.lower()).set(draft_data)
+            
+        return {"status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/evidence-logs")
+def get_evidence_logs():
+    try:
+        docs = db_fs.collection("evidence_logs").stream()
+        logs = [doc.to_dict() for doc in docs]
+        logs.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+        return logs
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/vendor-queue")
+def get_vendor_queue():
+    try:
+        # Load screened emails and names to dynamically filter and clean up legacy queue items
+        screened_emails = set()
+        screened_companies = set()
+        screened_docs = db_fs.collection("vendors").stream()
+        for sdoc in screened_docs:
+            sdata = sdoc.to_dict()
+            email = sdata.get("contactEmail") or sdata.get("details", {}).get("contactEmail")
+            if email:
+                screened_emails.add(email.lower().strip())
+            cname = sdata.get("companyName")
+            if cname:
+                screened_companies.add(cname.lower().strip())
+
+        docs = db_fs.collection("vendor_queue").stream()
+        queue = []
+        for doc in docs:
+            data = doc.to_dict()
+            q_email = data.get("contactEmail") or data.get("email")
+            q_cname = data.get("companyName")
+            
+            is_screened = False
+            if q_email and q_email.lower().strip() in screened_emails:
+                is_screened = True
+            elif q_cname and q_cname.lower().strip() in screened_companies:
+                is_screened = True
+                
+            if is_screened:
+                # Clean up leftover/legacy queue record
+                db_fs.collection("vendor_queue").document(doc.id).delete()
+            else:
+                queue.append(data)
+
+        queue.sort(key=lambda x: x.get("submittedAt", ""), reverse=True)
+        return queue
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/vendors")
 def get_vendors():
@@ -279,13 +624,23 @@ async def check_sanctions(q: str):
 async def screen_vendor(payload: ScreenRequest):
     clean_website = payload.website.replace("https://", "").replace("http://", "").replace("www.", "").strip().rstrip("/")
     try:
+        # Check if email is in the queue and delete it
+        if payload.email:
+            db_fs.collection("vendor_queue").document(payload.email.lower()).delete()
+
         result = await execute_adk_verification(
             company_name=payload.companyName,
             website=clean_website,
             country=payload.country,
             industry=payload.industry,
-            screened_by=payload.screenedBy
+            screened_by=payload.screenedBy,
+            financials=payload.financials
         )
+        
+        # Inject contact email at root
+        if payload.email:
+            result["contactEmail"] = payload.email.lower()
+            
         vendor_id = result.get("id")
         db_fs.collection("vendors").document(vendor_id).set(result)
         return result

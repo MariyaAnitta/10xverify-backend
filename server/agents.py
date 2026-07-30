@@ -4,13 +4,31 @@ import json
 import asyncio
 import httpx
 import datetime
+import hashlib
 from dotenv import load_dotenv
 from google.adk.agents import Agent
 from google.adk.models.google_llm import Gemini
 from google.adk.tools import google_search
 from google.adk.runners import InMemoryRunner
+from server.financial_validators import validate_iban, validate_swift, validate_vat
 
 load_dotenv()
+
+def log_evidence(vendor_id: str, company_name: str, api_source: str, query_param: str, status: str, response_data: any):
+    try:
+        from firebase_admin import firestore
+        db = firestore.client()
+        db.collection("evidence_logs").add({
+            "vendorId": vendor_id,
+            "companyName": company_name,
+            "timestamp": datetime.datetime.utcnow().isoformat() + "Z",
+            "apiSource": api_source,
+            "query": query_param,
+            "status": status,
+            "rawResponse": json.dumps(response_data)[:1200] if response_data else "None"
+        })
+    except Exception as e:
+        print(f"[Evidence Logging Error]: {e}")
 
 # Setup Gemini model
 api_key = os.getenv("GEMINI_API_KEY")
@@ -921,9 +939,21 @@ async def execute_adk_verification(
     website: str,
     country: str,
     industry: str,
-    screened_by: str
+    screened_by: str,
+    financials: dict = None
 ):
     input_message = f'Verify company "{company_name}" with website "{website}" in country "{country}" under industry "{industry}".'
+
+    # Compute stable vendor ID
+    n = company_name.lower()
+    n = re.sub(r'\(.*?\)', '', n)
+    n = re.sub(r'[^a-z0-9\s]', '', n)
+    suffixes = [r'\bltd\b', r'\blimited\b', r'\bpvt\b', r'\bprivate\b', r'\bco\b', r'\bcompany\b']
+    for s in suffixes:
+        n = re.sub(s, '', n)
+    norm_name = " ".join(n.split())
+    stable_hash = int(hashlib.md5(norm_name.encode('utf-8')).hexdigest(), 16) % 10000
+    vendor_id = f"vnd-{stable_hash}"
 
     # 1. Fetch Authoritative APIs in Parallel (routed by country)
     registry_data = None
@@ -957,6 +987,17 @@ async def execute_adk_verification(
         query_gnews(company_name)
     )
     print("[Python ADK Orchestrator] External API queries completed. Starting Corporate Agent...")
+    
+    # LOG TRANSACTIONS TO EVIDENCE REPOSITORY IN FIRESTORE
+    log_evidence(vendor_id, company_name, "Companies House / Registry", company_name, "200 OK" if registry_data else "No Result / Offline", registry_data)
+    log_evidence(vendor_id, company_name, "WhoisJSON WHOIS", website, "200 OK" if whois_data else "No Result / Offline", whois_data)
+    log_evidence(vendor_id, company_name, "LinkFinder Employees", website, "200 OK" if link_finder_data else "No Result / Offline", link_finder_data)
+    log_evidence(vendor_id, company_name, "OpenSanctions Screen", company_name, "200 OK" if opensanctions_data else "No Result / Offline", opensanctions_data)
+    log_evidence(vendor_id, company_name, "URLScan.io Threat Scan", website, "200 OK" if urlscan_data else "No Result / Offline", urlscan_data)
+    log_evidence(vendor_id, company_name, "VirusTotal Malware Scan", website, "200 OK" if virustotal_data else "No Result / Offline", virustotal_data)
+    log_evidence(vendor_id, company_name, "Mailboxlayer Verification", f"info@{website}", "200 OK" if mailboxlayer_data else "No Result / Offline", mailboxlayer_data)
+    log_evidence(vendor_id, company_name, "GNews Litigation Press", company_name, "200 OK" if gnews_data else "No Result / Offline", gnews_data)
+
     open_corp_data = registry_data
 
     # 2. Run Corporate Agent first
@@ -969,6 +1010,40 @@ async def execute_adk_verification(
     # Resolve Places verification
     address_to_validate = corp_obj.get("registeredAddress") or f"{company_name}, {country}"
     places_data = await query_geoapify_places(address_to_validate)
+    
+    log_evidence(vendor_id, company_name, "Geoapify GIS Geocoding", address_to_validate, "200 OK" if places_data else "No Result / Offline", places_data)
+
+    # Run Local Banking and VAT Validators if financials are provided
+    financial_report = "Financial Audit Report: Stated financial credentials not provided for verification."
+    if financials:
+        iban = financials.get("iban")
+        swift = financials.get("swift")
+        tax_id = financials.get("taxId")
+        
+        iban_report = "Not Provided"
+        if iban:
+            v_iban = validate_iban(iban)
+            iban_report = "VALID (Modulo-97 Verified)" if v_iban.get("valid") else f"INVALID ({v_iban.get('reason')})"
+            log_evidence(vendor_id, company_name, "Local IBAN Mod97 Check", iban, "200 OK", v_iban)
+            
+        swift_report = "Not Provided"
+        if swift:
+            v_swift = validate_swift(swift)
+            swift_report = "VALID (BIC Format Matches)" if v_swift.get("valid") else f"INVALID ({v_swift.get('reason')})"
+            log_evidence(vendor_id, company_name, "Local SWIFT BIC Regex Check", swift, "200 OK", v_swift)
+            
+        vat_report = "Not Provided"
+        if tax_id:
+            v_vat = await validate_vat(tax_id, country)
+            vat_report = f"VALID (Method: {v_vat.get('method', 'Direct API')})" if v_vat.get("valid") else f"INVALID ({v_vat.get('reason')})"
+            log_evidence(vendor_id, company_name, f"EU VIES VAT / National Tax Audit ({country})", tax_id, "200 OK" if v_vat.get("valid") else "Error/Invalid", v_vat)
+            
+        financial_report = (
+            f"Financial Credentials Audit Report:\n"
+            f"- Stated Bank IBAN Number: {iban or 'None'} // Checksum Status: {iban_report}\n"
+            f"- Stated Bank SWIFT/BIC Code: {swift or 'None'} // Format Status: {swift_report}\n"
+            f"- Stated Corporate Tax ID / VAT Number: {tax_id or 'None'} // Registry Status: {vat_report}"
+        )
 
     # 3. Parallelize Agents 2-6
     digital_prompt = (
@@ -984,7 +1059,8 @@ async def execute_adk_verification(
     location_prompt = f"{input_message} Corporate details: {corporate_raw}. {f'Geoapify API metrics: {json.dumps(places_data)}' if places_data else ''}"
     regulatory_prompt = (
         f"{input_message} Corporate details: {corporate_raw}.\n"
-        f"OpenSanctions API Ground Truth Matches: {json.dumps(opensanctions_data) if opensanctions_data else 'None'}"
+        f"OpenSanctions API Ground Truth Matches: {json.dumps(opensanctions_data) if opensanctions_data else 'None'}\n"
+        f"{financial_report}"
     )
 
     print("[Python ADK Orchestrator] Running Digital Agent...")
@@ -1002,7 +1078,7 @@ async def execute_adk_verification(
         f"{input_message} Corporate details: {corporate_raw}.\n"
         f"GNews API Recent Articles: {json.dumps(gnews_data) if gnews_data else 'None'}"
     )
-    financial_prompt = f"{input_message} Corporate details: {corporate_raw}."
+    financial_prompt = f"{input_message} Corporate details: {corporate_raw}.\n{financial_report}"
     
     print("[Python ADK Orchestrator] Running Reputation Agent...")
     res_reputation = await run_agent(reputation_agent, reputation_prompt)
@@ -1364,7 +1440,6 @@ async def execute_adk_verification(
         }
     }
 
-    import hashlib
     # Normalize company name (remove brackets, suffixes, and non-alphanumeric characters)
     n = company_name.lower()
     n = re.sub(r'\(.*?\)', '', n)

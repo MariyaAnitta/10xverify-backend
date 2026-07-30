@@ -85,7 +85,7 @@ export interface DashboardMetrics {
   complianceAlerts: {
     id: string;
     companyName: string;
-    alertType: "license_expiring" | "adverse_media" | "sanction_link" | "location_mismatch";
+    alertType: "license_expiring" | "adverse_media" | "sanction_link" | "location_mismatch" | "domain_change";
     severity: "medium" | "high" | "critical";
     description: string;
     date: string;

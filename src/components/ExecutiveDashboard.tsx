@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Search, Shield, AlertTriangle, CheckCircle, TrendingUp, Ban, ArrowUpRight, HelpCircle, Trash2, Download } from "lucide-react";
+import { Search, Shield, AlertTriangle, CheckCircle, TrendingUp, Ban, ArrowUpRight, HelpCircle, Trash2, Download, ShieldAlert, Globe, Gavel, RefreshCw } from "lucide-react";
 import { VendorScreening, DashboardMetrics, RiskRating } from "../types";
 
 interface ExecutiveDashboardProps {
@@ -13,6 +13,24 @@ interface ExecutiveDashboardProps {
 export default function ExecutiveDashboard({ vendors, metrics, onVendorSelect, onNewScreeningClick, onDeleteVendor }: ExecutiveDashboardProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRiskFilter, setSelectedRiskFilter] = useState<string>("ALL");
+  const [runningMonitoring, setRunningMonitoring] = useState(false);
+
+  const handleTriggerMonitoring = async () => {
+    setRunningMonitoring(true);
+    try {
+      const res = await fetch("/api/monitoring-alerts/trigger", { method: "POST" });
+      if (res.ok) {
+        alert("Continuous monitoring checks launched in the background! Please wait a moment and refresh to see new alerts.");
+      } else {
+        alert("Failed to trigger monitoring audit.");
+      }
+    } catch (e) {
+      console.error(e);
+      alert("Error triggering monitoring audit.");
+    } finally {
+      setRunningMonitoring(false);
+    }
+  };
 
   const handleExportCSV = () => {
     if (vendors.length === 0) {
@@ -173,18 +191,22 @@ export default function ExecutiveDashboard({ vendors, metrics, onVendorSelect, o
             
             <div className="flex items-center gap-2">
               <button
-                onClick={handleExportCSV}
-                className="px-4 py-2 bg-slate-105 hover:bg-slate-200 text-slate-700 border border-slate-200 font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center gap-1.5 cursor-pointer"
+                onClick={handleTriggerMonitoring}
+                disabled={runningMonitoring}
+                style={{ height: '36px', boxSizing: 'border-box' }}
+                className="px-4 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
               >
-                <Download className="w-3.5 h-3.5 text-blue-500" />
-                <span>Export BI Dataset (CSV)</span>
+                <RefreshCw className={`w-3.5 h-3.5 text-indigo-500 ${runningMonitoring ? "animate-spin" : ""}`} />
+                <span>{runningMonitoring ? "Auditing..." : "Run Weekly Audit Check"}</span>
               </button>
-
+ 
               <button
                 onClick={onNewScreeningClick}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-medium text-xs rounded-xl shadow-sm transition-all flex items-center gap-1 cursor-pointer"
+                style={{ height: '36px', boxSizing: 'border-box' }}
+                className="px-4 bg-blue-600 hover:bg-blue-700 text-white border border-blue-600 font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
               >
-                <span>+ Screen New Vendor</span>
+                <Shield className="w-3.5 h-3.5 text-white fill-white/10" />
+                <span>Screen New Vendor</span>
               </button>
             </div>
           </div>
@@ -375,18 +397,24 @@ export default function ExecutiveDashboard({ vendors, metrics, onVendorSelect, o
             <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
               {metrics.complianceAlerts.map(alert => (
                 <div key={alert.id} className="p-3 bg-slate-50/50 hover:bg-slate-50 rounded-xl border border-slate-100 flex items-start gap-2.5 transition-all text-xxs">
-                  {alert.severity === "critical" ? (
+                  {alert.alertType === "sanction_link" ? (
+                    <ShieldAlert className="w-4.5 h-4.5 text-red-650 shrink-0 mt-0.5 animate-pulse" />
+                  ) : alert.alertType === "domain_change" ? (
+                    <Globe className="w-4.5 h-4.5 text-amber-600 shrink-0 mt-0.5" />
+                  ) : alert.alertType === "adverse_media" ? (
+                    <Gavel className="w-4.5 h-4.5 text-red-500 shrink-0 mt-0.5" />
+                  ) : alert.severity === "critical" ? (
                     <Ban className="w-4.5 h-4.5 text-slate-950 shrink-0 mt-0.5" />
-                  ) : alert.severity === "high" ? (
-                    <AlertTriangle className="w-4.5 h-4.5 text-red-500 shrink-0 mt-0.5 animate-bounce" />
                   ) : (
                     <AlertTriangle className="w-4.5 h-4.5 text-amber-500 shrink-0 mt-0.5" />
                   )}
-
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between font-bold">
+ 
+                  <div className="space-y-1 w-full">
+                    <div className="flex items-center justify-between font-bold gap-2">
                       <span className="text-slate-900 line-clamp-1">{alert.companyName}</span>
-                      <span className="text-slate-400 font-normal">{alert.date}</span>
+                      <span className="text-slate-400 font-normal shrink-0">
+                        {alert.date?.includes("T") ? new Date(alert.date).toLocaleDateString() : alert.date}
+                      </span>
                     </div>
                     <p className="text-slate-600 leading-normal font-medium">{alert.description}</p>
                     <span className={`inline-block px-1.5 py-0.5 text-[8px] font-bold uppercase rounded ${
@@ -405,6 +433,7 @@ export default function ExecutiveDashboard({ vendors, metrics, onVendorSelect, o
           </div>
         </div>
       </div>
+
     </div>
   );
 }

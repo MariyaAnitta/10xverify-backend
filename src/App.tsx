@@ -1,16 +1,21 @@
 import React, { useState, useEffect } from "react";
-import { Shield, Brain, Sparkles, Database, HelpCircle, Activity, LayoutGrid, CheckSquare, Settings } from "lucide-react";
+import { Shield, Brain, Sparkles, Database, HelpCircle, Activity, LayoutGrid, CheckSquare, Settings, ClipboardList } from "lucide-react";
 import { VendorScreening, DashboardMetrics } from "./types";
 import ExecutiveDashboard from "./components/ExecutiveDashboard";
 import ProcurementDashboard from "./components/ProcurementDashboard";
 import ComplianceDashboard from "./components/ComplianceDashboard";
 import ScreeningPortal from "./components/ScreeningPortal";
 import VendorDetailDossier from "./components/VendorDetailDossier";
+import AuthScreen from "./components/AuthScreen";
+import VendorPortal from "./components/VendorPortal";
+import VendorQueueDashboard from "./components/VendorQueueDashboard";
+import EvidenceRepository from "./components/EvidenceRepository";
+import MetricsDashboard from "./components/MetricsDashboard";
 
 interface UserProfile {
   email: string;
   name: string;
-  role: "Compliance Officer" | "Vetting Officer";
+  role: "Compliance Officer" | "Vetting Officer" | "Vendor";
 }
 
 const DEFAULT_USERS: UserProfile[] = [
@@ -21,8 +26,9 @@ const DEFAULT_USERS: UserProfile[] = [
 export default function App() {
   const [vendors, setVendors] = useState<VendorScreening[]>([]);
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
-  const [activeTab, setActiveTab] = useState<"executive" | "procurement" | "compliance" | "screen">("executive");
+  const [activeTab, setActiveTab] = useState<"executive" | "procurement" | "compliance" | "screen" | "vendor-queue" | "evidence" | "metrics">("executive");
   const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null);
+  const [autoStartVendor, setAutoStartVendor] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [backendMode, setBackendMode] = useState<"AI_ACTIVE" | "SIMULATED">("SIMULATED");
 
@@ -31,11 +37,13 @@ export default function App() {
     return saved ? JSON.parse(saved) : null;
   });
 
+  const [monitoringAlerts, setMonitoringAlerts] = useState<any[]>([]);
+
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState("");
 
-  const calculateFrontendMetrics = (vendorList: VendorScreening[]): DashboardMetrics => {
+  const calculateFrontendMetrics = (vendorList: VendorScreening[], alerts: any[] = []): DashboardMetrics => {
     const total = vendorList.length;
     const green = vendorList.filter(v => v.riskRating === "GREEN").length;
     const amber = vendorList.filter(v => v.riskRating === "AMBER").length;
@@ -53,16 +61,19 @@ export default function App() {
     });
     const industryBreakdown = Object.entries(indMap).map(([name, count]) => ({ name, count }));
 
-    const complianceAlerts = vendorList
-      .filter(v => ["RED", "BLACK"].includes(v.riskRating))
-      .map(v => ({
-        id: `alert-${v.id}`,
-        companyName: v.companyName,
-        alertType: (v.riskRating === "BLACK" ? "sanction_link" : "adverse_media") as any,
-        severity: (v.riskRating === "BLACK" ? "critical" : "high") as any,
-        description: `Flagged by Risk Intelligence: ${v.recommendation}`,
-        date: v.screenedAt
-      }));
+    const complianceAlerts = [
+      ...vendorList
+        .filter(v => ["RED", "BLACK"].includes(v.riskRating))
+        .map(v => ({
+          id: `alert-${v.id}`,
+          companyName: v.companyName,
+          alertType: (v.riskRating === "BLACK" ? "sanction_link" : "adverse_media") as any,
+          severity: (v.riskRating === "BLACK" ? "critical" : "high") as any,
+          description: `Flagged by Risk Intelligence: ${v.recommendation}`,
+          date: v.screenedAt
+        })),
+      ...alerts
+    ];
 
     return {
       totalScreened: total,
@@ -86,22 +97,27 @@ export default function App() {
         setBackendMode(body.mode);
       }
 
+      // Fetch Monitoring Alerts
+      let activeAlerts: any[] = [];
+      const reqAlerts = await fetch("/api/monitoring-alerts");
+      if (reqAlerts.ok) {
+        activeAlerts = await reqAlerts.json();
+        setMonitoringAlerts(activeAlerts || []);
+      }
+
       // Fetch Vendors list
       const reqVendors = await fetch("/api/vendors");
       if (reqVendors.ok) {
         const list: VendorScreening[] = await reqVendors.json();
         setVendors(prev => {
-          // Merge lists: keep items in prev that aren't in list yet
           const merged = [...list];
           for (const item of prev) {
             if (!merged.some(v => v.id === item.id)) {
               merged.push(item);
             }
           }
-          // Sort descending screenedAt
           merged.sort((a, b) => new Date(b.screenedAt).getTime() - new Date(a.screenedAt).getTime());
-          // Update metrics reactively based on the fully merged state
-          setMetrics(calculateFrontendMetrics(merged));
+          setMetrics(calculateFrontendMetrics(merged, activeAlerts));
           return merged;
         });
       }
@@ -118,18 +134,20 @@ export default function App() {
   }, []);
 
   const handleNewScreeningComplete = (newVendor: VendorScreening) => {
-    // Append locally immediately so the selected vendor is guaranteed to exist in the list
+    setAutoStartVendor(null);
     setVendors(prev => {
       const updated = prev.some(v => v.id === newVendor.id) ? prev : [newVendor, ...prev];
-      // Update metrics reactively
-      setMetrics(calculateFrontendMetrics(updated));
+      setMetrics(calculateFrontendMetrics(updated, monitoringAlerts));
       return updated;
     });
-    // Automatically transition to the Executive Dashboard and open the newly screened dossier
     setSelectedVendorId(newVendor.id);
     setActiveTab("executive");
-    // Refresh metrics & list in the background
     fetchState(false);
+  };
+
+  const handleQueueToScreening = (vendorData: any) => {
+    setAutoStartVendor(vendorData);
+    setActiveTab("screen");
   };
 
   const handleStatusChange = async (id: string, status: "Approved" | "Rejected") => {
@@ -146,10 +164,9 @@ export default function App() {
         const updated: VendorScreening = await response.json();
         setVendors(prev => {
           const updatedList = prev.map(v => v.id === id ? updated : v);
-          setMetrics(calculateFrontendMetrics(updatedList));
+          setMetrics(calculateFrontendMetrics(updatedList, monitoringAlerts));
           return updatedList;
         });
-        // Refresh everything
         fetchState(false);
       } else if (response.status === 403) {
         alert("Action Forbidden: Only a Compliance Officer can approve or reject onboarding status.");
@@ -170,10 +187,9 @@ export default function App() {
         const updated: VendorScreening = await response.json();
         setVendors(prev => {
           const updatedList = prev.map(v => v.id === id ? updated : v);
-          setMetrics(calculateFrontendMetrics(updatedList));
+          setMetrics(calculateFrontendMetrics(updatedList, monitoringAlerts));
           return updatedList;
         });
-        // Refresh metrics as well
         fetchState(false);
       }
     } catch (err) {
@@ -190,7 +206,7 @@ export default function App() {
       if (response.ok) {
         setVendors(prev => {
           const updatedList = prev.filter(v => v.id !== id);
-          setMetrics(calculateFrontendMetrics(updatedList));
+          setMetrics(calculateFrontendMetrics(updatedList, monitoringAlerts));
           return updatedList;
         });
         setSelectedVendorId(null);
@@ -201,98 +217,19 @@ export default function App() {
     }
   };
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoginError("");
-
-    // Simulate password check (since we aren't changing the backend DB)
-    const user = DEFAULT_USERS.find(u => u.email.toLowerCase() === loginEmail.toLowerCase());
-    
-    let isPasswordCorrect = false;
-    if (user) {
-      const emailLower = user.email.toLowerCase();
-      if (emailLower === "complianceofficer@10xverify.ai" && loginPassword === "admin123") {
-        isPasswordCorrect = true;
-      } else if (emailLower === "officer@10xverify.ai" && loginPassword === "verify123") {
-        isPasswordCorrect = true;
-      }
-    }
-
-    if (user && isPasswordCorrect) {
-      setCurrentUser(user);
-      localStorage.setItem("10xverify_user", JSON.stringify(user));
-      // Clear form
-      setLoginEmail("");
-      setLoginPassword("");
-    } else {
-      setLoginError("Invalid email or password.");
-    }
-  };
+  const selectedVendor = vendors.find(v => v.id === selectedVendorId);
 
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem("10xverify_user");
   };
 
-  const selectedVendor = vendors.find(v => v.id === selectedVendorId);
-
   if (!currentUser) {
-    return (
-      <div className="min-h-screen bg-slate-900 text-slate-100 flex items-center justify-center p-6 font-sans">
-        <div className="max-w-md w-full bg-slate-800 border border-slate-700/60 rounded-3xl p-8 shadow-2xl space-y-8 animate-fade-in">
-          <div className="text-center space-y-3">
-            <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto shadow-lg shadow-indigo-500/25">
-              <Shield className="w-8 h-8 text-emerald-400" />
-            </div>
-            <h1 className="text-2xl font-black tracking-tight text-white mt-4">10xVerify.AI</h1>
-            <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed">
-              Secure Corporate Due Diligence and Compliance Gateway. Select your role profile to access the ledger.
-            </p>
-          </div>
+    return <AuthScreen onLogin={setCurrentUser} />;
+  }
 
-          <form onSubmit={handleLogin} className="space-y-4">
-            {loginError && (
-              <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-400 text-center animate-fade-in">
-                {loginError}
-              </div>
-            )}
-            <div className="space-y-1.5 text-left">
-              <label className="text-[10px] font-bold text-slate-450 uppercase tracking-widest block pl-1">Email Address</label>
-              <input
-                type="email"
-                required
-                value={loginEmail}
-                onChange={(e) => setLoginEmail(e.target.value)}
-                placeholder="e.g. complianceofficer@10xverify.ai"
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
-              />
-            </div>
-            <div className="space-y-1.5 text-left">
-              <label className="text-[10px] font-bold text-slate-450 uppercase tracking-widest block pl-1">Password</label>
-              <input
-                type="password"
-                required
-                value={loginPassword}
-                onChange={(e) => setLoginPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full bg-slate-900 border border-slate-700 rounded-xl px-4 py-3 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all"
-              />
-            </div>
-            <button
-              type="submit"
-              className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3.5 px-4 rounded-xl transition-colors shadow-lg shadow-indigo-500/25 mt-2 text-sm cursor-pointer"
-            >
-              Sign In to Ledger
-            </button>
-            
-          </form>
-
-          <div className="text-center text-[10px] text-slate-500 font-mono">
-            Blockchain Audit Locks Active • #HCL-9382-7721C
-          </div>
-        </div>
-      </div>
-    );
+  if (currentUser.role === "Vendor") {
+    return <VendorPortal currentUser={currentUser} onLogout={handleLogout} />;
   }
 
   return (
@@ -338,7 +275,10 @@ export default function App() {
             { id: "executive", label: "Executive Dashboard", desc: "Board overview", icon: LayoutGrid },
             { id: "procurement", label: "Procurement Workflows", desc: "Fast triage desk", icon: CheckSquare },
             { id: "compliance", label: "Compliance & Blacklists", desc: "SDN & regulatory logs", icon: Shield },
-            { id: "screen", label: "Workforce Screening", desc: "Deploy AI Agents", icon: Brain }
+            { id: "metrics", label: "Risk Metrics", desc: "Platform analytics", icon: Activity },
+            { id: "screen", label: "Workforce Screening", desc: "Deploy AI Agents", icon: Brain },
+            { id: "vendor-queue", label: "Vendor Portal Queue", desc: "Audit registrations", icon: ClipboardList },
+            { id: "evidence", label: "Evidence Logs", desc: "Audit registry pack", icon: Database }
           ].map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id && !selectedVendorId;
@@ -397,6 +337,7 @@ export default function App() {
                 onAddComment={(comment) => handleAddComment(selectedVendor.id, comment)}
                 onDeleteVendor={handleDeleteVendor}
                 currentUser={currentUser}
+                monitoringAlerts={monitoringAlerts}
               />
             ) : (
               /* Regular workspace tabs */
@@ -428,10 +369,25 @@ export default function App() {
                   />
                 )}
 
+                {activeTab === "metrics" && (
+                  <MetricsDashboard vendors={vendors} />
+                )}
+
                 {activeTab === "screen" && (
                   <ScreeningPortal
                     onScreeningComplete={handleNewScreeningComplete}
+                    autoStartVendor={autoStartVendor}
                   />
+                )}
+
+                {activeTab === "vendor-queue" && (
+                  <VendorQueueDashboard
+                    onProcessVendor={handleQueueToScreening}
+                  />
+                )}
+
+                {activeTab === "evidence" && (
+                  <EvidenceRepository />
                 )}
               </>
             )}
