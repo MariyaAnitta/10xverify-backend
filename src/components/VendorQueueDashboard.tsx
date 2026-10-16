@@ -37,7 +37,7 @@ export default function VendorQueueDashboard({ onProcessVendor }: VendorQueueDas
             </div>
             <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Vendor Self-Onboarding Queue</h2>
           </div>
-          <p className="text-sm text-slate-500">Audit newly submitted supplier profiles, compliance certificates, and 10xIDP digital signatures.</p>
+          <p className="text-sm text-slate-500">Audit newly submitted supplier profiles, compliance credentials, and digital signatures.</p>
         </div>
         <button
           onClick={fetchQueue}
@@ -101,7 +101,7 @@ export default function VendorQueueDashboard({ onProcessVendor }: VendorQueueDas
             <div className="flex-grow flex flex-col items-center justify-center p-12 text-center text-slate-400">
               <Shield className="w-12 h-12 mb-4 text-slate-200" strokeWidth={1} />
               <h3 className="text-sm font-bold text-slate-500 uppercase tracking-widest mb-2">Audit Details Workspace</h3>
-              <p className="text-xs max-w-xs leading-relaxed">Select a vendor self-onboarding application from the left list to review their business files and invoke 10xIDP verification diagnostics.</p>
+              <p className="text-xs max-w-xs leading-relaxed">Select a vendor self-onboarding application from the left list to review their business profile and route to the multi-agent vetting pipeline.</p>
             </div>
           ) : (
             <div className="p-6 md:p-8 flex-grow flex flex-col">
@@ -134,15 +134,15 @@ export default function VendorQueueDashboard({ onProcessVendor }: VendorQueueDas
                 </div>
 
                 <div>
-                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Financial Data</h4>
+                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-3">Submission Details</h4>
                   <div className="bg-slate-50 rounded-xl p-4 border border-slate-100 space-y-3">
                     <div>
-                      <div className="text-[9px] text-slate-500">Bank Name</div>
-                      <div className="text-sm font-semibold">{selectedSubmission.financials?.bankName}</div>
+                      <div className="text-[9px] text-slate-500">Contact Email</div>
+                      <div className="text-sm font-semibold">{selectedSubmission.contactEmail}</div>
                     </div>
                     <div>
-                      <div className="text-[9px] text-slate-500">IBAN</div>
-                      <div className="text-sm font-mono text-slate-700">{selectedSubmission.financials?.iban}</div>
+                      <div className="text-[9px] text-slate-500">Official Website</div>
+                      <div className="text-sm font-mono text-indigo-600 truncate">{selectedSubmission.website}</div>
                     </div>
                   </div>
                 </div>

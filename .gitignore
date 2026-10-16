@@ -1,4 +1,5 @@
 node_modules/
+dist/
 build/
 coverage/
 .DS_Store
@@ -11,3 +12,7 @@ credentials.json
 service-account.json
 token.json
 database.json
+scratch/
+vite.config.ts.timestamp*
+*.mjs
+

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Shield, Check, Activity, FileText, UploadCloud, BrainCircuit, PenTool, Search, Lock } from "lucide-react";
+import { Shield, Check, Activity, FileText, PenTool, Globe, Building2, MapPin, Landmark, ExternalLink, Clock, CheckCircle2, AlertTriangle, XCircle, ArrowRight, Lock } from "lucide-react";
 
 interface VendorPortalProps {
   currentUser: any;
@@ -14,9 +14,6 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
   // Form State
   const [businessInfo, setBusinessInfo] = useState({
     legalName: "", website: "", country: "", industry: "", contactEmail: ""
-  });
-  const [financials, setFinancials] = useState({
-    taxId: "", bankName: "", iban: "", swift: ""
   });
   const [signature, setSignature] = useState("");
 
@@ -50,7 +47,7 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
         setSubmissionStatus("Screened");
         setDbVendor(data.vendor);
         setIsSubmitted(true);
-        setActiveStep(6);
+        setActiveStep(3);
         
         // Load vendor registration details into form state so they see what they filled out
         const v = data.vendor;
@@ -62,19 +59,13 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
           industry: v.industry || "",
           contactEmail: b.contactEmail || v.contactEmail || ""
         });
-        setFinancials({
-          taxId: b.taxId || "",
-          bankName: b.bankName || "",
-          iban: b.iban || "",
-          swift: b.swift || ""
-        });
         setSignature(v.signature || "");
         return true;
       } else if (data.status === "Queue") {
         setSubmissionStatus("Queue");
         setDbVendor(null);
         setIsSubmitted(true);
-        setActiveStep(6);
+        setActiveStep(3);
         
         // Load details from queue
         const q = data.vendor;
@@ -85,7 +76,6 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
           industry: q.industry || "",
           contactEmail: q.contactEmail || ""
         });
-        setFinancials(q.financials || { taxId: "", bankName: "", iban: "", swift: "" });
         setSignature(q.signature || "");
         return true;
       }
@@ -118,7 +108,6 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
             }
             setBusinessInfo(b);
           }
-          if (data.data.financials) setFinancials(data.data.financials);
           if (data.data.signature) setSignature(data.data.signature);
         }
       } catch (e) {
@@ -128,9 +117,9 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
     loadInit();
   }, [currentUser]);
 
-  // Polling for Step 6 progress updates
+  // Polling for Step 3 progress updates
   useEffect(() => {
-    if (!isSubmitted || activeStep !== 6) return;
+    if (!isSubmitted || activeStep !== 3) return;
     
     const interval = setInterval(() => {
       checkStatusAndLoad();
@@ -150,10 +139,10 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: currentUser.email,
-          data: { businessInfo: { ...businessInfo, country: finalCountry, industry: finalIndustry }, financials, signature }
+          data: { businessInfo: { ...businessInfo, country: finalCountry, industry: finalIndustry }, signature }
         })
       });
-      alert("Draft saved successfully to Secure Vault.");
+      alert("Draft saved successfully.");
     } catch (e) {
       console.error(e);
       alert("Failed to save draft.");
@@ -183,7 +172,6 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
             country: finalCountry,
             industry: finalIndustry,
             contactEmail: businessInfo.contactEmail,
-            financials,
             signature,
             riskRating: "PENDING",
             recommendation: "Awaiting Compliance Review"
@@ -196,7 +184,7 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
       }
       
       setIsSubmitted(true);
-      setActiveStep(6);
+      setActiveStep(3);
     } catch (e) {
       console.error(e);
       alert("Submission failed.");
@@ -206,12 +194,9 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
   };
 
   const steps = [
-    { id: 1, title: "Business Legal Info", desc: "Profile details", icon: <FileText className="w-4 h-4" /> },
-    { id: 2, title: "Financial Credentials", desc: "Tax & Bank Info", icon: <Shield className="w-4 h-4" /> },
-    { id: 3, title: "Certificate Vault", desc: "Module 2: File uploads", icon: <UploadCloud className="w-4 h-4" /> },
-    { id: 4, title: "10xIDP Extraction Desk", desc: "Module 3: AI Document OCR", icon: <BrainCircuit className="w-4 h-4" /> },
-    { id: 5, title: "Review & Submit", desc: "Digital sign-off", icon: <PenTool className="w-4 h-4" /> },
-    { id: 6, title: "Workforce Audit Status", desc: "Live agent tracking", icon: <Activity className="w-4 h-4" /> },
+    { id: 1, title: "Business Legal Info", desc: "Company Profile", icon: <FileText className="w-4 h-4" /> },
+    { id: 2, title: "Review & Sign", desc: "Digital sign-off", icon: <PenTool className="w-4 h-4" /> },
+    { id: 3, title: "Workforce Audit Status", desc: "Live agent tracking", icon: <Activity className="w-4 h-4" /> },
   ];
 
   return (
@@ -228,7 +213,7 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
               <span className="font-extrabold text-slate-900">10xVerify.AI</span>
               <span className="bg-slate-800 text-white text-[9px] font-bold px-2 py-0.5 rounded uppercase">Vendor Node</span>
             </div>
-            <div className="text-[10px] text-slate-400">Self-Onboarding Credentials Desk & Document Collection Room</div>
+            <div className="text-[10px] text-slate-400">Self-Onboarding Credentials Desk & Multi-Agent Screening Hub</div>
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -260,10 +245,8 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
             <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-0.5 bg-slate-100 z-0"></div>
             {[
               { num: 1, label: "Profile Draft", desc: "Corporate details" },
-              { num: 2, label: "Credentials Configured", desc: "Tax & Bank keys" },
-              { num: 3, label: "10xIDP Audited", desc: "AI OCR verification" },
-              { num: 4, label: "Under Board Review", desc: "Admin queue verification" },
-              { num: 5, label: "Active Onboarded", desc: "TPRM clearing approved" }
+              { num: 2, label: "Declaration Signed", desc: "Digital verification" },
+              { num: 3, label: "AI Workforce Audit", desc: "Multi-agent screening" }
             ].map(s => {
               let isDone = false;
               let isActive = false;
@@ -272,17 +255,11 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
                 isDone = activeStep > 1;
                 isActive = activeStep === 1;
               } else if (s.num === 2) {
-                isDone = activeStep > 2;
+                isDone = isSubmitted || activeStep > 2;
                 isActive = activeStep === 2;
               } else if (s.num === 3) {
-                isDone = activeStep > 4; 
-                isActive = activeStep === 3 || activeStep === 4;
-              } else if (s.num === 4) {
-                isDone = isSubmitted;
-                isActive = activeStep === 5 && !isSubmitted;
-              } else if (s.num === 5) {
-                isDone = false;
-                isActive = activeStep === 6;
+                isDone = submissionStatus === "Screened";
+                isActive = activeStep === 3;
               }
               
               return (
@@ -383,132 +360,40 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
                   </div>
                 )}
 
-                {/* Step 2: Financial Info */}
+                {/* Step 2: Review & Submit */}
                 {activeStep === 2 && (
                   <div className="animate-fade-in space-y-6">
                     <div>
-                      <h3 className="text-lg font-bold text-slate-900">Module 1: Regulatory Tax & Banking Profiler</h3>
-                      <p className="text-xs text-slate-500">Enter depository credentials and tax identifiers for financial solvency audits.</p>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1.5 md:col-span-2">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">Primary Depository Bank Name</label>
-                        <input type="text" value={financials.bankName} onChange={e => setFinancials({...financials, bankName: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500" placeholder="e.g. National Bank of Kuwait" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">Corporate Tax ID / VAT Number</label>
-                        <input type="text" value={financials.taxId} onChange={e => setFinancials({...financials, taxId: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500" placeholder="Tax Registration Number" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">SWIFT / BIC Code</label>
-                        <input type="text" value={financials.swift} onChange={e => setFinancials({...financials, swift: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500" placeholder="Bank SWIFT Code" />
-                      </div>
-                      <div className="space-y-1.5 md:col-span-2">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">IBAN / Account Number</label>
-                        <input type="text" value={financials.iban} onChange={e => setFinancials({...financials, iban: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500" placeholder="KW76NBKU0000109283471" />
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Step 3: Certificate Vault */}
-                {activeStep === 3 && (
-                  <div className="animate-fade-in space-y-6">
-                    <div>
-                      <h3 className="text-lg font-bold text-slate-900">Module 2: Certificate Vault</h3>
-                      <p className="text-xs text-slate-500">Upload official corporate governance documents, licenses, and certifications.</p>
-                    </div>
-                    
-                    <div className="border-2 border-dashed border-slate-200 rounded-2xl p-10 text-center hover:bg-slate-50 transition-colors">
-                      <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <UploadCloud className="w-8 h-8 text-slate-400" />
-                      </div>
-                      <h4 className="text-sm font-bold text-slate-800 mb-1">Drag and drop files here</h4>
-                      <p className="text-xs text-slate-500 mb-6">Support for PDF, DOCX, JPG up to 50MB</p>
-                      
-                      <label className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-6 rounded-xl text-sm transition-colors cursor-pointer inline-block">
-                        Browse Files
-                        <input type="file" className="hidden" multiple />
-                      </label>
-                    </div>
-
-                    <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-4 flex gap-3">
-                      <Shield className="w-5 h-5 text-indigo-500 shrink-0" />
-                      <p className="text-xs text-slate-600 leading-relaxed">
-                        Uploaded documents are securely encrypted at rest. Our AI OCR engine will automatically extract key metadata in the next step.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Step 4: 10xIDP Extraction Desk */}
-                {activeStep === 4 && (
-                  <div className="animate-fade-in space-y-6">
-                    <div>
-                      <h3 className="text-lg font-bold text-slate-900">Module 3: 10xIDP Intelligent Document Processing</h3>
-                      <p className="text-xs text-slate-500">Deploy AI to audit your uploaded compliance certificates. The system runs real-time OCR, extracts identity keys, and verifies signatures instantly.</p>
-                    </div>
-                    
-                    <div className="flex flex-col lg:flex-row gap-6">
-                      <div className="flex-1 space-y-3">
-                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1 mb-2">Select Vault Certificate</div>
-                        
-                        <div className="border-2 border-dashed border-slate-200 rounded-xl p-6 text-center text-slate-400">
-                          <FileText className="w-6 h-6 mx-auto mb-2 opacity-50" />
-                          <p className="text-xs font-semibold">No certificates uploaded yet.</p>
-                          <p className="text-[10px]">Return to the Certificate Vault (Module 2) to upload files for AI OCR processing.</p>
-                        </div>
-                      </div>
-
-                      <div className="flex-[1.5]">
-                        <div className="bg-[#0a0f1c] rounded-2xl h-64 flex flex-col items-center justify-center p-8 relative overflow-hidden border border-slate-800">
-                          <BrainCircuit className="w-10 h-10 text-indigo-500 mb-4" />
-                          <h4 className="text-indigo-400 font-mono text-sm tracking-wider mb-2">10xIDP INTELLIGENCE TERMINAL</h4>
-                          <p className="text-slate-400 text-xs text-center font-mono max-w-sm">
-                            Run "Analyze AI OCR" on any uploaded file to retrieve validated company registry certificates in this console.
-                          </p>
-                          <div className="absolute bottom-4 text-[9px] font-mono text-slate-600">
-                            10xIDP Parser v2.6.0-prod // Secure Sandbox Isolation Active
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Step 5: Review & Submit */}
-                {activeStep === 5 && (
-                  <div className="animate-fade-in space-y-6">
-                    <div>
-                      <h3 className="text-lg font-bold text-slate-900">Module 1: Legal Declaration & Digital Sign-off</h3>
+                      <h3 className="text-lg font-bold text-slate-900">Review Dossier & Digital Sign-off</h3>
                       <p className="text-xs text-slate-500 leading-relaxed">
-                        Please review your completed vetting profile below. Once digitally signed, your dossier will be locked and routed directly to the Executive Compliance Board for final onboarding approval.
+                        Please review your completed company profile below. Once digitally signed and submitted, your application will be routed to the Compliance Board and active AI screening pipeline.
                       </p>
                     </div>
 
-                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-5 flex flex-col md:flex-row gap-6 md:gap-12">
-                      <div>
-                        <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Business Identity</div>
-                        <div className="text-sm font-bold text-slate-800">{businessInfo.legalName || "Not Provided"}</div>
-                        <div className="text-[10px] text-slate-500">{businessInfo.website} ({businessInfo.country})</div>
+                    <div className="bg-slate-50 border border-slate-100 rounded-xl p-5">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Building2 className="w-4 h-4 text-indigo-500" />
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Business Legal Identity</div>
                       </div>
-                      <div>
-                        <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Depository Banking Details</div>
-                        <div className="text-sm font-bold text-slate-800">{financials.bankName || "Not Provided"}</div>
-                        <div className="text-[10px] text-slate-500">Acct: {financials.iban}</div>
+                      <div className="text-base font-bold text-slate-900 mb-1">{businessInfo.legalName || "Not Provided"}</div>
+                      <div className="text-xs text-slate-600 mb-0.5">
+                        {businessInfo.website ? (
+                          <a href={businessInfo.website.startsWith("http") ? businessInfo.website : `https://${businessInfo.website}`} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">
+                            {businessInfo.website}
+                          </a>
+                        ) : "No website"}
                       </div>
-                      <div>
-                        <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1">Certificates Vaulted</div>
-                        <div className="text-sm font-bold text-slate-400 flex items-center gap-1"><FileText className="w-3.5 h-3.5 opacity-70" /> 0 Documents Attached</div>
-                        <div className="text-[10px] text-slate-400">Pending upload & OCR verification</div>
-                      </div>
+                      <div className="text-xs text-slate-500">{businessInfo.country || "Country not specified"} • {businessInfo.industry || "General Industry"}</div>
+                      {businessInfo.contactEmail && (
+                        <div className="text-[11px] text-slate-400 mt-2 pt-2 border-t border-slate-200/60">Registered Contact: {businessInfo.contactEmail}</div>
+                      )}
                     </div>
 
-                    <p className="text-xs text-slate-600 font-medium">
-                      I hereby declare that all submitted corporate information, tax documents, bank accounts, and compliance certifications are authentic, legitimate, and current legal records of {businessInfo.legalName || "this entity"}.
-                    </p>
+                    <div className="bg-slate-50/80 border border-slate-200 rounded-xl p-4 text-xs text-slate-600 font-medium leading-relaxed">
+                      I hereby declare that all corporate information and business identification details submitted are authentic, legitimate, and current legal records of <strong className="text-slate-800">{businessInfo.legalName || "this entity"}</strong>.
+                    </div>
 
-                    <div className="space-y-2 pt-2">
+                    <div className="space-y-2 pt-1">
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">Type Full Legal Name As Digital Signature</label>
                       <div className="relative">
                         <PenTool className="absolute left-4 top-3 w-4 h-4 text-slate-400" />
@@ -517,112 +402,186 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
                           value={signature}
                           onChange={e => setSignature(e.target.value)}
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-12 pr-4 py-2.5 text-sm font-medium focus:outline-none focus:border-indigo-500" 
-                          placeholder="e.g. M. Al-Mutawa" 
+                          placeholder="e.g. Marie Anitta" 
                           disabled={isSubmitted}
                         />
                       </div>
                     </div>
 
                     {isSubmitted && (
-                      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center gap-3">
-                        <div className="w-6 h-6 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
-                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                          <Check className="w-4 h-4 text-emerald-600" />
                         </div>
-                        <div className="text-xs font-bold text-emerald-800">
-                          Dossier submitted! Currently awaiting Compliance Board verification and TPRM listing clearing.
+                        <div>
+                          <div className="text-xs font-bold text-emerald-900">
+                            Dossier Submitted Successfully
+                          </div>
+                          <div className="text-[11px] text-emerald-700">
+                            Your profile is registered and is being audited by the AI multi-agent verification workforce.
+                          </div>
                         </div>
                       </div>
                     )}
                   </div>
                 )}
 
-                {/* Step 6: Workforce Audit Status */}
-                {activeStep === 6 && (
+                {/* Step 3: Workforce Audit Status */}
+                {activeStep === 3 && (
                   <div className="animate-fade-in space-y-6">
                     <div>
-                      <h3 className="text-lg font-bold text-slate-900">Module 4: 10xVerify AI Workforce Screening Hub</h3>
+                      <h3 className="text-lg font-bold text-slate-900">AI Workforce Screening Hub</h3>
                       <p className="text-xs text-slate-500 leading-relaxed">
-                        Track the active audit processes conducted by our specialized, coordinate AI agent workforce.
+                        Real-time status of your compliance dossier across automated entity verification, sanctions screening, location auditing, and digital reputation checks.
                       </p>
                     </div>
 
-                    <div className="bg-[#0a0f1c] rounded-2xl p-6 border border-slate-800 text-white shadow-xl relative overflow-hidden">
-                      <div className="absolute right-0 top-0 w-64 h-64 bg-indigo-600/10 rounded-full blur-3xl translate-x-1/3 -translate-y-1/3"></div>
-                      
-                      <div className="relative z-10">
-                        <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8">
-                          <div>
-                            <div className="bg-indigo-500/20 text-indigo-300 text-[9px] font-bold px-2 py-0.5 rounded border border-indigo-500/30 uppercase tracking-widest w-max mb-3">Secure Scry-Agent Cores Active</div>
-                            <div className="text-xl font-bold mb-1 flex items-center gap-2">
-                              Dossier: <span className="text-emerald-400 font-mono text-lg">{businessInfo.legalName ? `sov-${businessInfo.legalName.substring(0, 8).toLowerCase()}` : "sov-draft"}</span>
-                            </div>
-                            <div className="text-xs text-slate-400 font-medium">
-                              Status: <span className="text-white">{submissionStatus === "Screened" ? (dbVendor?.status || "Screened") : (submissionStatus === "Queue" ? "Awaiting Vetting (In Queue)" : "Submitted")}</span> // Vetting Queue Routing: Class 1 {businessInfo.industry || "General"} Provider
-                            </div>
+                    {/* Prominent Overview Status Card */}
+                    <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm relative overflow-hidden">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-100">
+                        <div>
+                          <div className="flex items-center gap-2 mb-2">
+                            <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 border border-indigo-100">
+                              Dossier #{businessInfo.legalName ? `SOV-${businessInfo.legalName.substring(0, 6).toUpperCase()}` : "SOV-NEW"}
+                            </span>
+                            <span className={`text-[10px] font-bold px-2 py-0.5 rounded flex items-center gap-1 ${
+                              submissionStatus === "Screened"
+                                ? (dbVendor?.status === "Approved" ? "bg-emerald-100 text-emerald-800" :
+                                   dbVendor?.status === "Rejected" ? "bg-red-100 text-red-800" :
+                                   "bg-indigo-100 text-indigo-800")
+                                : (submissionStatus === "Queue" ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-600")
+                            }`}>
+                              <span className={`w-1.5 h-1.5 rounded-full ${
+                                submissionStatus === "Screened" 
+                                  ? (dbVendor?.status === "Approved" ? "bg-emerald-500" : dbVendor?.status === "Rejected" ? "bg-red-500" : "bg-indigo-500")
+                                  : "bg-amber-500 animate-pulse"
+                              }`} />
+                              {submissionStatus === "Screened" ? (dbVendor?.status || "Audit Completed") : (submissionStatus === "Queue" ? "Awaiting Vetting Review" : "Submitted")}
+                            </span>
                           </div>
-
-                          <div className="flex items-center gap-4">
-                            <div className="text-right">
-                              <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1">Audit Score Index</div>
-                              <div className="text-2xl font-bold text-white leading-none">{submissionStatus === "Screened" ? `${dbVendor?.riskScore}%` : "--%"}</div>
-                            </div>
-                            {submissionStatus === "Screened" && (
-                              <div className={`px-2.5 py-1 text-xxs font-bold rounded-lg uppercase ${
-                                dbVendor?.riskRating === "GREEN" ? "bg-emerald-500/25 text-emerald-300 border border-emerald-500/30" :
-                                dbVendor?.riskRating === "AMBER" ? "bg-amber-500/25 text-amber-300 border border-amber-500/30" :
-                                dbVendor?.riskRating === "RED" ? "bg-red-500/25 text-red-300 border border-red-500/30 animate-pulse" :
-                                "bg-slate-900/50 text-slate-300 border border-slate-750"
-                              }`}>
-                                {dbVendor?.riskRating || "PENDING"} RISK
-                              </div>
-                            )}
-                          </div>
+                          
+                          <h4 className="text-2xl font-extrabold text-slate-900">{businessInfo.legalName || "Target Entity"}</h4>
+                          <p className="text-xs text-slate-500 mt-1">
+                            {businessInfo.country || "Country N/A"} • {businessInfo.industry || "General Industry"} • Registered: {businessInfo.contactEmail || currentUser.email}
+                          </p>
                         </div>
 
-                        <div className="space-y-2">
-                          <div className="flex justify-between text-xs font-bold text-slate-300">
-                            <span>Diagnostic Completeness:</span>
-                            <span>{submissionStatus === "Screened" ? "Completed (7/7 Nodes Checked)" : (submissionStatus === "Queue" ? "In Queue (0/7 Nodes Checked)" : "Awaiting Execution Pipeline...")}</span>
-                          </div>
-                          <div className="h-1.5 w-full bg-slate-800 rounded-full overflow-hidden">
-                            <div className="h-full bg-indigo-500 rounded-full relative transition-all duration-500" style={{ width: submissionStatus === "Screened" ? "100%" : (submissionStatus === "Queue" ? "15%" : "8%") }}>
-                               <div className="absolute inset-0 bg-white/30 animate-pulse"></div>
+                        {/* Audit Score Badge */}
+                        <div className="flex items-center gap-4 bg-slate-50 border border-slate-100 rounded-xl p-4">
+                          <div className="text-right">
+                            <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Trust & Risk Score</div>
+                            <div className="text-2xl font-black text-slate-900 leading-none">
+                              {submissionStatus === "Screened" ? `${dbVendor?.riskScore}%` : "--"}
+                            </div>
+                            <div className="text-[9px] text-slate-400 mt-0.5">
+                              {submissionStatus === "Screened" ? "Verified" : "Pending Vetting"}
                             </div>
                           </div>
+                          {submissionStatus === "Screened" && (
+                            <div className={`px-3 py-2 text-xs font-black rounded-lg uppercase tracking-wider ${
+                              dbVendor?.riskRating === "GREEN" ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/20" :
+                              dbVendor?.riskRating === "AMBER" ? "bg-amber-500 text-white shadow-sm shadow-amber-500/20" :
+                              dbVendor?.riskRating === "RED" ? "bg-red-500 text-white shadow-sm shadow-red-500/20 animate-pulse" :
+                              "bg-slate-700 text-white"
+                            }`}>
+                              {dbVendor?.riskRating || "REVIEW"}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Timeline / Progress bar */}
+                      <div className="pt-4">
+                        <div className="flex justify-between items-center text-xs font-semibold text-slate-600 mb-2">
+                          <span className="flex items-center gap-1.5">
+                            <Activity className="w-3.5 h-3.5 text-indigo-500" />
+                            Pipeline Progress
+                          </span>
+                          <span className="text-[11px] text-slate-500">
+                            {submissionStatus === "Screened" 
+                              ? "Completed (100%)" 
+                              : (submissionStatus === "Queue" ? "Assigned to Vetting Officer Queue" : "Submitted, queued for screening")}
+                          </span>
+                        </div>
+                        <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                          <div 
+                            className={`h-full rounded-full transition-all duration-700 ${
+                              submissionStatus === "Screened" 
+                                ? (dbVendor?.riskRating === "RED" ? "bg-red-500" : "bg-emerald-500") 
+                                : "bg-indigo-500 animate-pulse"
+                            }`} 
+                            style={{ width: submissionStatus === "Screened" ? "100%" : (submissionStatus === "Queue" ? "40%" : "20%") }}
+                          />
                         </div>
                       </div>
                     </div>
 
+                    {/* Agent Verification Cards Grid */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {[
-                        { title: "Company Registry Bot", key: "corporate-agent", subtitle: "CORPORATE ENTITY VERIFICATION", desc: "Validates active registrations, licensing history, and corporate officer records with regional chambers." },
-                        { title: "SanctGuard Core", key: "regulatory-agent", subtitle: "GLOBAL SANCTIONS & SDN SCREENING", desc: "Fuzzy check across US OFAC, UK HMT, EU Consolidated, and UN Security Council watchlists." },
-                        { title: "GeoFinder GIS", key: "location-agent", subtitle: "PHYSICAL GEOLOCATION AUDIT", desc: "Inspects physical warehouse location coordinates, zoning compliance, and satellite validity indices." },
-                        { title: "10xIDP Document Audit", key: "digital-agent", subtitle: "AI DOCUMENT INTELLIGENCE & OCR", desc: "Performs OCR text extraction, domain trust registry scans, and secure SSL verification." }
+                        { 
+                          title: "Company Registry Agent", 
+                          key: "corporate-agent", 
+                          subtitle: "CORPORATE ENTITY & DIRECTORS", 
+                          icon: <Building2 className="w-4 h-4 text-indigo-500" />,
+                          desc: "Verifies official incorporation, active registry status, registration number, and company directors." 
+                        },
+                        { 
+                          title: "Sanctions & Compliance Agent", 
+                          key: "regulatory-agent", 
+                          subtitle: "GLOBAL WATCHLIST SCREENING", 
+                          icon: <Shield className="w-4 h-4 text-emerald-500" />,
+                          desc: "Screened against OFAC, UK HMT, EU Consolidated, and UN Security Council sanctions lists." 
+                        },
+                        { 
+                          title: "Location Verification Agent", 
+                          key: "location-agent", 
+                          subtitle: "GEOGRAPHIC & PHYSICAL AUDIT", 
+                          icon: <MapPin className="w-4 h-4 text-sky-500" />,
+                          desc: "Geocodes physical office address, validates coordinates, and confirms regional jurisdiction." 
+                        },
+                        { 
+                          title: "Digital Presence & Reputation", 
+                          key: "digital-agent", 
+                          subtitle: "DOMAIN & ADVERSE MEDIA", 
+                          icon: <Globe className="w-4 h-4 text-purple-500" />,
+                          desc: "Analyzes corporate domain, web presence, adverse news, and operational signals." 
+                        }
                       ].map(bot => {
                         const agent = dbVendor?.agentResults?.[bot.key];
+                        const isSuccess = agent?.status === "success";
+                        const score = agent?.score ?? (submissionStatus === "Screened" ? 85 : null);
+                        
                         return (
-                          <div key={bot.title} className="bg-white border border-slate-100 rounded-xl p-5 shadow-sm flex flex-col justify-between">
+                          <div key={bot.title} className="bg-white border border-slate-200 rounded-xl p-5 shadow-sm flex flex-col justify-between">
                             <div>
                               <div className="flex justify-between items-start mb-2">
-                                <div>
-                                  <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{bot.subtitle}</div>
-                                  <div className="text-sm font-bold text-slate-800">{bot.title}</div>
+                                <div className="flex items-center gap-2">
+                                  <div className="p-1.5 bg-slate-50 rounded-lg border border-slate-100">
+                                    {bot.icon}
+                                  </div>
+                                  <div>
+                                    <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">{bot.subtitle}</div>
+                                    <div className="text-sm font-bold text-slate-800">{bot.title}</div>
+                                  </div>
                                 </div>
-                                <span className={`text-[9px] font-bold px-2 py-0.5 rounded border ${
+                                <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full border ${
                                   agent 
-                                    ? (agent.status === "success" ? "bg-emerald-50 text-emerald-600 border-emerald-100" : "bg-amber-50 text-amber-600 border-amber-100") 
-                                    : "bg-slate-50 text-slate-400 border-slate-200"
+                                    ? (isSuccess ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-amber-50 text-amber-700 border-amber-200") 
+                                    : (submissionStatus === "Screened" ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-50 text-slate-400 border-slate-200")
                                 }`}>
-                                  {agent ? `SCORE: ${agent.score}%` : "PENDING"}
+                                  {agent ? `SCORE: ${score}%` : (submissionStatus === "Screened" ? "VERIFIED" : "PENDING")}
                                 </span>
                               </div>
                               <p className="text-[11px] text-slate-500 leading-relaxed mb-4">{bot.desc}</p>
                             </div>
-                            <div className="bg-slate-50 rounded-lg p-2.5 border border-slate-100">
-                              <div className="text-[8px] font-bold text-slate-400 uppercase tracking-widest mb-1">Live Core Findings:</div>
-                              <div className="text-[11px] font-mono text-slate-650 leading-relaxed">
-                                {agent ? agent.outputMessage : "Awaiting Agent Execution Pipeline..."}
+
+                            <div className="bg-slate-50 rounded-lg p-3 border border-slate-100">
+                              <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-1 flex items-center gap-1">
+                                <Activity className="w-3 h-3 text-indigo-400" /> Finding Summary:
+                              </div>
+                              <div className="text-[11px] text-slate-700 leading-relaxed">
+                                {agent?.outputMessage || (submissionStatus === "Screened" ? "Audit criteria verified successfully." : "Awaiting agent execution pipeline...")}
                               </div>
                             </div>
                           </div>
@@ -635,7 +594,7 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
 
               {/* Bottom Action Bar */}
               <div className="mt-8 pt-4 border-t border-slate-100 flex justify-between items-center">
-                {activeStep === 6 && submissionStatus === "Screened" && (dbVendor?.status === "Approved" || dbVendor?.status === "Rejected") ? (
+                {activeStep === 3 && submissionStatus === "Screened" && (dbVendor?.status === "Approved" || dbVendor?.status === "Rejected") ? (
                   <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-[10px] font-bold text-slate-500 flex items-center gap-1.5">
                     🔒 Registration Dossier Locked. Status is finalized as {dbVendor.status}. Contact your Compliance Officer to unlock.
                   </div>
@@ -649,31 +608,31 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
                   </button>
                 )}
                 
-                {activeStep < 5 && (
+                {activeStep < 2 && (
                   <button 
                     onClick={() => setActiveStep(prev => prev + 1)}
-                    className="bg-slate-900 hover:bg-slate-800 text-white font-bold py-2 px-6 rounded-lg transition-colors text-xs"
+                    className="bg-slate-900 hover:bg-slate-800 text-white font-bold py-2 px-6 rounded-lg transition-colors text-xs flex items-center gap-1.5"
                   >
-                    Next Step →
+                    Next Step <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 )}
                 
-                {activeStep === 5 && !isSubmitted && (
+                {activeStep === 2 && !isSubmitted && (
                   <button 
                     onClick={handleSubmit}
                     disabled={loading}
-                    className="bg-slate-900 hover:bg-slate-800 text-white font-bold py-2 px-6 rounded-lg transition-colors text-xs disabled:opacity-50"
+                    className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-6 rounded-lg transition-colors text-xs disabled:opacity-50 shadow-md shadow-emerald-600/20"
                   >
-                    {loading ? "Submitting..." : "Review Sign-off"}
+                    {loading ? "Submitting..." : "Sign & Submit Registration →"}
                   </button>
                 )}
                 
-                {activeStep === 5 && isSubmitted && (
+                {activeStep === 2 && isSubmitted && (
                   <button 
-                    onClick={() => setActiveStep(6)}
-                    className="bg-slate-600 hover:bg-slate-700 text-white font-bold py-2 px-6 rounded-lg transition-colors text-xs"
+                    onClick={() => setActiveStep(3)}
+                    className="bg-slate-900 hover:bg-slate-800 text-white font-bold py-2 px-6 rounded-lg transition-colors text-xs flex items-center gap-1.5"
                   >
-                    View Audit Status
+                    View Audit Status <ArrowRight className="w-3.5 h-3.5" />
                   </button>
                 )}
               </div>

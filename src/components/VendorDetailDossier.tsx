@@ -483,8 +483,8 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
 
       {/* Compliance comments and Audit timeline */}
       {!pdfMode && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white border border-slate-100 rounded-2xl p-6 md:col-span-2 shadow-sm space-y-4">
+        <div className="w-full">
+          <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm space-y-4">
             <h3 className="text-sm font-bold text-slate-950 uppercase tracking-wider pb-2 border-b flex items-center gap-1.5">
               <MessageSquare className="w-4 h-4 text-blue-500" />
               Compliance Log Comment thread
@@ -542,27 +542,6 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
                 </div>
               </div>
             </form>
-          </div>
-
-          <div className="bg-slate-900 border border-slate-850 text-slate-300 rounded-2xl p-6 shadow-sm flex flex-col justify-between space-y-4">
-            <div className="space-y-2">
-              <div className="text-[10px] text-indigo-400 font-black uppercase tracking-wider">Security Certificate</div>
-              <h4 className="font-bold text-white text-sm tracking-tight">Vetting Credential Encrypted</h4>
-              <p className="text-xxs text-slate-400 font-mono leading-relaxed">
-                This report is authenticated under Blockchain anchor hash #HCL-9382-7721C. Evidence collections are locked on localized Sandboxed cloud repositories.
-              </p>
-            </div>
-
-            <div className="border-t border-slate-800 pt-3 space-y-2 text-xxs">
-              <div className="flex items-center gap-1.5 text-emerald-400 font-semibold">
-                <CheckCircle className="w-4 h-4 shrink-0" />
-                <span>Registry lock authenticated</span>
-              </div>
-              <div className="flex items-center gap-1.5 text-slate-400 font-sans font-medium">
-                <Shield className="w-4 h-4 shrink-0" />
-                <span>Audit hash logged in legal files</span>
-              </div>
-            </div>
           </div>
         </div>
       )}
