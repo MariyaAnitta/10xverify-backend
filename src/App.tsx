@@ -204,9 +204,12 @@ export default function App() {
         method: "DELETE"
       });
       if (response.ok) {
+        const targetVendor = vendors.find(v => v.id === id);
+        const compName = targetVendor?.companyName?.toLowerCase().trim();
+        setMonitoringAlerts(prev => prev.filter(a => a.vendorId !== id && a.companyName?.toLowerCase().trim() !== compName));
         setVendors(prev => {
           const updatedList = prev.filter(v => v.id !== id);
-          setMetrics(calculateFrontendMetrics(updatedList, monitoringAlerts));
+          setMetrics(calculateFrontendMetrics(updatedList, monitoringAlerts.filter(a => a.vendorId !== id && a.companyName?.toLowerCase().trim() !== compName)));
           return updatedList;
         });
         setSelectedVendorId(null);

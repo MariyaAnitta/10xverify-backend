@@ -149,10 +149,15 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
 
       {/* Continuous Monitoring Alert Banner */}
       {(() => {
-        const companyAlerts = monitoringAlerts.filter(alert => 
-          alert.vendorId === vendor.id || 
-          alert.companyName?.toLowerCase().trim() === vendor.companyName?.toLowerCase().trim()
-        );
+        const screenedDate = vendor.screenedAt ? new Date(vendor.screenedAt).getTime() : 0;
+        const companyAlerts = monitoringAlerts.filter(alert => {
+          const isMatchingCompany = alert.vendorId === vendor.id || 
+            alert.companyName?.toLowerCase().trim() === vendor.companyName?.toLowerCase().trim();
+          if (!isMatchingCompany) return false;
+          // Only show alerts that actually occurred AFTER the vendor was screened
+          const alertDate = alert.date ? new Date(alert.date).getTime() : 0;
+          return alertDate > screenedDate;
+        });
         if (companyAlerts.length === 0) return null;
         return (
           <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-6 space-y-3 animate-fade-in print:hidden">

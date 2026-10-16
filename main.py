@@ -561,8 +561,31 @@ def delete_vendor(vendor_id: str):
         doc = doc_ref.get()
         if not doc.exists:
             raise HTTPException(status_code=404, detail="Vendor not found")
+        
+        vendor_data = doc.to_dict() or {}
+        company_name = vendor_data.get("companyName", "").strip()
+        contact_email = vendor_data.get("contactEmail", "").strip().lower()
+
+        # 1. Delete vendor document
         doc_ref.delete()
-        return {"status": "success", "message": f"Vendor {vendor_id} deleted."}
+
+        # 2. Completely delete all monitoring alerts associated with this vendor
+        alerts_ref = db_fs.collection("monitoring_alerts")
+        for alert_doc in alerts_ref.where("vendorId", "==", vendor_id).stream():
+            alert_doc.reference.delete()
+        if company_name:
+            for alert_doc in alerts_ref.where("companyName", "==", company_name).stream():
+                alert_doc.reference.delete()
+
+        # 3. Clean up any related drafts or queue items if present
+        if contact_email:
+            try:
+                db_fs.collection("onboarding_drafts").document(contact_email).delete()
+                db_fs.collection("vendor_queue").document(contact_email).delete()
+            except Exception:
+                pass
+
+        return {"status": "success", "message": f"Vendor {vendor_id} and all historical monitoring alerts deleted."}
     except HTTPException:
         raise
     except Exception as e:
@@ -643,6 +666,17 @@ async def screen_vendor(payload: ScreenRequest):
             
         vendor_id = result.get("id")
         db_fs.collection("vendors").document(vendor_id).set(result)
+
+        # Clear outdated continuous monitoring alerts for this freshly vetted vendor
+        try:
+            alerts_ref = db_fs.collection("monitoring_alerts")
+            for alert_doc in alerts_ref.where("vendorId", "==", vendor_id).stream():
+                alert_doc.reference.delete()
+            for alert_doc in alerts_ref.where("companyName", "==", payload.companyName).stream():
+                alert_doc.reference.delete()
+        except Exception as alert_err:
+            print(f"[screen_vendor] Note: Failed to purge old alerts: {alert_err}")
+
         return result
     except Exception as e:
         import traceback
