@@ -910,6 +910,7 @@ async def run_agent(agent: Agent, message: str) -> str:
         # Buffer queries slightly
         await asyncio.sleep(0.25)
         import uuid
+        import inspect
         from google.genai import types
         from google.adk.runners import Runner
         from google.adk.sessions.in_memory_session_service import InMemorySessionService
@@ -917,27 +918,38 @@ async def run_agent(agent: Agent, message: str) -> str:
         from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
 
         session_service = InMemorySessionService()
-        runner = Runner(
-            agent=agent,
-            app_name=agent.name,
-            session_service=session_service,
-            artifact_service=InMemoryArtifactService(),
-            memory_service=InMemoryMemoryService(),
-            auto_create_session=True
-        )
-
+        app_name = agent.name or "10xVerify"
         user_id = "system"
         session_id = str(uuid.uuid4())
-        
-        # Explicitly pre-create session in the session service to guarantee it exists
+
+        # Safely create session (works whether async or sync in different ADK versions)
         try:
-            await session_service.create_session(
-                app_name=runner.app_name,
-                user_id=user_id,
-                session_id=session_id
-            )
+            create_fn = session_service.create_session
+            if inspect.iscoroutinefunction(create_fn):
+                await create_fn(app_name=app_name, user_id=user_id, session_id=session_id)
+            else:
+                res = create_fn(app_name=app_name, user_id=user_id, session_id=session_id)
+                if inspect.isawaitable(res):
+                    await res
         except Exception as e:
-            print(f"[run_agent] create_session warning: {e}")
+            print(f"[run_agent] session pre-creation notice: {e}")
+
+        # Construct Runner compatibly with any ADK version
+        runner_kwargs = {
+            "agent": agent,
+            "app_name": app_name,
+            "session_service": session_service,
+            "artifact_service": InMemoryArtifactService(),
+            "memory_service": InMemoryMemoryService(),
+        }
+        # Only pass auto_create_session if the Runner.__init__ accepts it
+        init_sig = inspect.signature(Runner.__init__)
+        if "auto_create_session" in init_sig.parameters:
+            runner_kwargs["auto_create_session"] = True
+
+        runner = Runner(**runner_kwargs)
+        if hasattr(runner, "auto_create_session"):
+            runner.auto_create_session = True
 
         raw = ""
         async for ev in runner.run_async(
