@@ -909,24 +909,37 @@ async def run_agent(agent: Agent, message: str) -> str:
     async with llm_semaphore:
         # Buffer queries slightly
         await asyncio.sleep(0.25)
-        runner = InMemoryRunner(agent=agent, app_name=agent.name)
-        runner.auto_create_session = True
-        raw = ""
         import uuid
         from google.genai import types
+        from google.adk.runners import Runner
+        from google.adk.sessions.in_memory_session_service import InMemorySessionService
+        from google.adk.artifacts.in_memory_artifact_service import InMemoryArtifactService
+        from google.adk.memory.in_memory_memory_service import InMemoryMemoryService
+
+        session_service = InMemorySessionService()
+        runner = Runner(
+            agent=agent,
+            app_name=agent.name,
+            session_service=session_service,
+            artifact_service=InMemoryArtifactService(),
+            memory_service=InMemoryMemoryService(),
+            auto_create_session=True
+        )
+
         user_id = "system"
         session_id = str(uuid.uuid4())
         
-        # Explicitly ensure session exists in the in-memory session service
+        # Explicitly pre-create session in the session service to guarantee it exists
         try:
-            await runner.session_service.create_session(
+            await session_service.create_session(
                 app_name=runner.app_name,
                 user_id=user_id,
                 session_id=session_id
             )
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[run_agent] create_session warning: {e}")
 
+        raw = ""
         async for ev in runner.run_async(
             user_id=user_id,
             session_id=session_id,
