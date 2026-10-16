@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Shield, RefreshCw, FileText, CheckCircle, Clock } from "lucide-react";
+import { Shield, RefreshCw, FileText, CheckCircle, Clock, Trash2 } from "lucide-react";
 
 interface VendorQueueDashboardProps {
   onProcessVendor: (vendor: any) => void;
@@ -159,12 +159,35 @@ export default function VendorQueueDashboard({ onProcessVendor }: VendorQueueDas
                 </div>
               </div>
 
-              <div className="pt-6 border-t border-slate-100 flex justify-end">
+              <div className="pt-6 border-t border-slate-100 flex items-center justify-between">
+                <button
+                  onClick={async () => {
+                    const targetEmail = selectedSubmission.contactEmail || selectedSubmission.email || selectedSubmission.id;
+                    if (!window.confirm(`Are you sure you want to reject and remove the submission for ${selectedSubmission.companyName}?`)) return;
+                    try {
+                      const res = await fetch(`/api/vendor-queue/${encodeURIComponent(targetEmail)}`, { method: "DELETE" });
+                      if (res.ok) {
+                        setQueue(prev => prev.filter(item => (item.contactEmail || item.email || item.id) !== targetEmail));
+                        setSelectedSubmission(null);
+                      } else {
+                        alert("Failed to reject submission.");
+                      }
+                    } catch (e) {
+                      console.error("Failed to reject vendor submission", e);
+                      alert("Error rejecting vendor submission.");
+                    }
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2.5 bg-red-50 hover:bg-red-100 text-red-700 text-xs font-semibold rounded-xl transition-all cursor-pointer border border-red-200"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Reject / Dismiss Application</span>
+                </button>
+
                 <button 
                   onClick={() => onProcessVendor(selectedSubmission)}
-                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-6 rounded-xl transition-colors shadow-lg shadow-indigo-500/25 text-sm"
+                  className="bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2.5 px-6 rounded-xl transition-colors shadow-lg shadow-indigo-500/25 text-xs flex items-center gap-2 cursor-pointer"
                 >
-                  Move to Active Vetting Pipeline →
+                  <span>Move to Active Vetting Pipeline →</span>
                 </button>
               </div>
             </div>

@@ -480,6 +480,20 @@ def get_vendor_queue():
 
         queue.sort(key=lambda x: x.get("submittedAt", ""), reverse=True)
         return queue
+@app.delete("/api/vendor-queue/{email}")
+def delete_from_vendor_queue(email: str):
+    try:
+        clean_email = email.lower().strip()
+        doc_ref = db_fs.collection("vendor_queue").document(clean_email)
+        doc = doc_ref.get()
+        if doc.exists:
+            doc_ref.delete()
+        # Also clean draft if present
+        try:
+            db_fs.collection("onboarding_drafts").document(clean_email).delete()
+        except Exception:
+            pass
+        return {"status": "success", "message": f"Application for {clean_email} rejected/removed from queue."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
