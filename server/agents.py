@@ -909,14 +909,27 @@ async def run_agent(agent: Agent, message: str) -> str:
     async with llm_semaphore:
         # Buffer queries slightly
         await asyncio.sleep(0.25)
-        runner = InMemoryRunner(agent=agent)
+        runner = InMemoryRunner(agent=agent, app_name=agent.name)
         runner.auto_create_session = True
         raw = ""
         import uuid
         from google.genai import types
+        user_id = "system"
+        session_id = str(uuid.uuid4())
+        
+        # Explicitly ensure session exists in the in-memory session service
+        try:
+            await runner.session_service.create_session(
+                app_name=runner.app_name,
+                user_id=user_id,
+                session_id=session_id
+            )
+        except Exception:
+            pass
+
         async for ev in runner.run_async(
-            user_id="system",
-            session_id=str(uuid.uuid4()),
+            user_id=user_id,
+            session_id=session_id,
             new_message=types.Content(parts=[types.Part(text=message)])
         ):
             if ev.content and ev.content.parts:
