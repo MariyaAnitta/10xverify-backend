@@ -870,17 +870,20 @@ async def query_geoapify_places(address: str):
 async def query_opensanctions(company_name: str):
     api_key = os.getenv("OPENSANCTIONS_API_KEY")
     if not api_key or api_key == "your_key_here" or api_key.strip() == "":
+        print(f"[OpenSanctions API] Missing or empty OPENSANCTIONS_API_KEY.")
         return None
     try:
         url = "https://api.opensanctions.org/search/default"
-        headers = {"Authorization": f"ApiKey {api_key}"}
+        headers = {"Authorization": f"ApiKey {api_key.strip()}"}
         params = {
             "q": company_name,
             "limit": 5,
             "schema": "Company"
         }
+        print(f"[OpenSanctions API] Querying for: {company_name}...")
         async with httpx.AsyncClient() as client:
-            res = await client.get(url, params=params, headers=headers, timeout=5.0)
+            res = await client.get(url, params=params, headers=headers, timeout=12.0)
+            print(f"[OpenSanctions API] Response status: {res.status_code}")
             if res.status_code == 200:
                 data = res.json()
                 results = data.get("results", [])
@@ -895,13 +898,18 @@ async def query_opensanctions(company_name: str):
                         "summary": properties.get("summary", []),
                         "topics": properties.get("topics", [])
                     })
-                return {
+                payload_res = {
                     "totalHits": len(results),
                     "hits": hits
                 }
+                print(f"[OpenSanctions API] Successfully parsed {len(results)} hits for {company_name}")
+                return payload_res
+            else:
+                print(f"[OpenSanctions API] HTTP {res.status_code}: {res.text}")
+                return None
     except Exception as e:
-        print(f"[OpenSanctions API] Error: {e}")
-    return None
+        print(f"[OpenSanctions API] Exception: {e}")
+        return None
 
 llm_semaphore = asyncio.Semaphore(2)
 
