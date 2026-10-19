@@ -162,12 +162,12 @@ export default function VendorQueueDashboard({ onProcessVendor }: VendorQueueDas
               <div className="pt-6 border-t border-slate-100 flex items-center justify-between">
                 <button
                   onClick={async () => {
-                    const targetEmail = selectedSubmission.contactEmail || selectedSubmission.email || selectedSubmission.id;
+                    const targetId = selectedSubmission._docId || selectedSubmission.contactEmail || selectedSubmission.email || selectedSubmission.id;
                     if (!window.confirm(`Are you sure you want to reject and remove the submission for ${selectedSubmission.companyName}?`)) return;
                     try {
-                      const res = await fetch(`/api/vendor-queue/${encodeURIComponent(targetEmail)}`, { method: "DELETE" });
+                      const res = await fetch(`/api/vendor-queue/${encodeURIComponent(targetId)}`, { method: "DELETE" });
                       if (res.ok) {
-                        setQueue(prev => prev.filter(item => (item.contactEmail || item.email || item.id) !== targetEmail));
+                        setQueue(prev => prev.filter(item => (item._docId || item.contactEmail || item.email || item.id) !== targetId));
                         setSelectedSubmission(null);
                       } else {
                         alert("Failed to reject submission.");

@@ -476,6 +476,7 @@ def get_vendor_queue():
                 # Clean up leftover/legacy queue record
                 db_fs.collection("vendor_queue").document(doc.id).delete()
             else:
+                data["_docId"] = doc.id
                 queue.append(data)
 
         queue.sort(key=lambda x: x.get("submittedAt", ""), reverse=True)
@@ -483,20 +484,29 @@ def get_vendor_queue():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.delete("/api/vendor-queue/{email}")
-def delete_from_vendor_queue(email: str):
+@app.delete("/api/vendor-queue/{identifier}")
+def delete_from_vendor_queue(identifier: str):
     try:
-        clean_email = email.lower().strip()
-        doc_ref = db_fs.collection("vendor_queue").document(clean_email)
-        doc = doc_ref.get()
-        if doc.exists:
-            doc_ref.delete()
-        # Also clean draft if present
+        clean_id = identifier.lower().strip()
+        # 1. Try deleting by document ID
+        db_fs.collection("vendor_queue").document(clean_id).delete()
+        
+        # 2. Also search if document ID was different (e.g. email or id)
+        docs = db_fs.collection("vendor_queue").stream()
+        for doc in docs:
+            d = doc.to_dict()
+            em = (d.get("contactEmail") or d.get("email") or "").lower().strip()
+            cname = (d.get("companyName") or "").lower().strip()
+            if em == clean_id or cname == clean_id or doc.id.lower() == clean_id:
+                db_fs.collection("vendor_queue").document(doc.id).delete()
+
+        # 3. Purge drafts for this email
         try:
-            db_fs.collection("onboarding_drafts").document(clean_email).delete()
+            db_fs.collection("onboarding_drafts").document(clean_id).delete()
         except Exception:
             pass
-        return {"status": "success", "message": f"Application for {clean_email} rejected/removed from queue."}
+
+        return {"status": "success", "message": f"Application for {clean_id} rejected/removed from queue."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
