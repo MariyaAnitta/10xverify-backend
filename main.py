@@ -480,6 +480,9 @@ def get_vendor_queue():
 
         queue.sort(key=lambda x: x.get("submittedAt", ""), reverse=True)
         return queue
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @app.delete("/api/vendor-queue/{email}")
 def delete_from_vendor_queue(email: str):
     try:
