@@ -10,7 +10,13 @@ interface ComplianceDashboardProps {
 
 export default function ComplianceDashboard({ vendors, metrics, onVendorSelect }: ComplianceDashboardProps) {
   const [sanctionsQuery, setSanctionsQuery] = useState("");
-  const [sanctionsResult, setSanctionsResult] = useState<{ checked: boolean; matchFound: boolean; details?: string } | null>(null);
+  const [sanctionsResult, setSanctionsResult] = useState<{ 
+    checked: boolean; 
+    matchFound: boolean; 
+    details?: string; 
+    apiSource?: string;
+    rawPayload?: any;
+  } | null>(null);
   const [loading, setLoading] = useState(false);
 
   const handleSanctionsCheck = async (e: React.FormEvent) => {
@@ -26,7 +32,9 @@ export default function ComplianceDashboard({ vendors, metrics, onVendorSelect }
         setSanctionsResult({
           checked: true,
           matchFound: data.matchFound,
-          details: data.details
+          details: data.details,
+          apiSource: data.apiSource,
+          rawPayload: data.rawPayload
         });
       } else {
         throw new Error("Failed to check sanctions");
