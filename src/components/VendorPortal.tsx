@@ -78,6 +78,11 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
         });
         setSignature(q.signature || "");
         return true;
+      } else if (data.status === "Not_Found") {
+        setSubmissionStatus("Not_Found");
+        setDbVendor(null);
+        setIsSubmitted(false);
+        return false;
       }
       return false;
     } catch (err) {
@@ -436,6 +441,33 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
                       </p>
                     </div>
 
+                    {/* If Admin/Officer dismissed the application */}
+                    {submissionStatus === "Not_Found" && (
+                      <div className="bg-red-50 border border-red-200 rounded-2xl p-5 mb-6 space-y-3 animate-fade-in">
+                        <div className="flex items-start gap-3">
+                          <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                          <div>
+                            <h4 className="text-sm font-bold text-red-900">Application Dismissed / Not In Queue</h4>
+                            <p className="text-xs text-red-700 mt-1 leading-relaxed">
+                              Your self-onboarding submission was reviewed and rejected or removed from the active queue by the compliance officer. 
+                              You can unlock and update your profile information to re-submit.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="pt-2">
+                          <button
+                            onClick={() => {
+                              setIsSubmitted(false);
+                              setActiveStep(1);
+                            }}
+                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm"
+                          >
+                            Edit & Re-Submit Application →
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Prominent Overview Status Card */}
                     <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm relative overflow-hidden">
                       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-slate-100">
@@ -449,14 +481,17 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
                                 ? (dbVendor?.status === "Approved" ? "bg-emerald-100 text-emerald-800" :
                                    dbVendor?.status === "Rejected" ? "bg-red-100 text-red-800" :
                                    "bg-indigo-100 text-indigo-800")
-                                : (submissionStatus === "Queue" ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-600")
+                                : (submissionStatus === "Queue" ? "bg-amber-100 text-amber-800" : 
+                                   submissionStatus === "Not_Found" ? "bg-red-100 text-red-800" : "bg-slate-100 text-slate-600")
                             }`}>
                               <span className={`w-1.5 h-1.5 rounded-full ${
                                 submissionStatus === "Screened" 
                                   ? (dbVendor?.status === "Approved" ? "bg-emerald-500" : dbVendor?.status === "Rejected" ? "bg-red-500" : "bg-indigo-500")
-                                  : "bg-amber-500 animate-pulse"
+                                  : (submissionStatus === "Not_Found" ? "bg-red-500" : "bg-amber-500 animate-pulse")
                               }`} />
-                              {submissionStatus === "Screened" ? (dbVendor?.status || "Audit Completed") : (submissionStatus === "Queue" ? "Awaiting Vetting Review" : "Submitted")}
+                              {submissionStatus === "Screened" ? (dbVendor?.status || "Audit Completed") : 
+                               (submissionStatus === "Queue" ? "Awaiting Vetting Review" : 
+                                submissionStatus === "Not_Found" ? "Application Dismissed" : "Submitted")}
                             </span>
                           </div>
                           
