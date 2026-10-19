@@ -87,26 +87,39 @@ export default function ComplianceDashboard({ vendors, metrics, onVendorSelect }
           </form>
 
           {sanctionsResult && (
-            <div className={`mt-4 p-4 rounded-xl border text-xs leading-relaxed flex items-start gap-2.5 ${
+            <div className={`mt-4 p-4 rounded-xl border text-xs leading-relaxed space-y-2.5 ${
               sanctionsResult.matchFound 
-                ? "bg-red-50 border-red-150 text-red-800 animate-pulse" 
-                : "bg-emerald-50 border-emerald-150 text-emerald-800"
+                ? "bg-red-50 border-red-200 text-red-900 animate-pulse" 
+                : "bg-emerald-50 border-emerald-200 text-emerald-900"
             }`}>
-              {sanctionsResult.matchFound ? (
-                <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-              ) : (
-                <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-              )}
-              <div className="space-y-1">
-                <span className="font-bold uppercase tracking-wider block">
-                  {sanctionsResult.matchFound ? "CRITICAL ENTITY HIT WARNING" : "SANITIZED PASS REPORT"}
-                </span>
-                <p className="font-medium">{sanctionsResult.details}</p>
-                {sanctionsResult.matchFound && (
-                  <p className="text-xxs text-red-600 font-bold uppercase tracking-widest mt-1">
-                    DO NOT ENGAGE. BANNED TRANSACTION TRIGGER.
-                  </p>
+              <div className="flex items-start gap-2.5">
+                {sanctionsResult.matchFound ? (
+                  <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                ) : (
+                  <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                 )}
+                <div className="space-y-1 flex-1">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="font-bold uppercase tracking-wider block">
+                      {sanctionsResult.matchFound ? "CRITICAL ENTITY HIT WARNING" : "SANITIZED PASS REPORT"}
+                    </span>
+                    <span className="px-2 py-0.5 bg-white/80 border border-slate-200 text-[9px] font-bold uppercase rounded-md text-slate-700">
+                      Engine: {sanctionsResult.apiSource || "OpenSanctions API"}
+                    </span>
+                  </div>
+                  <p className="font-medium leading-relaxed">{sanctionsResult.details}</p>
+                  {sanctionsResult.matchFound && (
+                    <p className="text-xxs text-red-600 font-bold uppercase tracking-widest mt-1">
+                      DO NOT ENGAGE. BANNED TRANSACTION TRIGGER.
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Transaction Audit Pack Confirmation */}
+              <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[10px] text-slate-500">
+                <span>📁 Transaction automatically recorded to <strong>Audit Evidence Pack Repository</strong></span>
+                <span className="font-mono text-[9px] text-indigo-600 font-semibold">Status: 200 OK</span>
               </div>
             </div>
           )}

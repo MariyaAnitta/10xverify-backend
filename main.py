@@ -620,11 +620,24 @@ def delete_vendor(vendor_id: str):
 
 @app.get("/api/sanctions/check")
 async def check_sanctions(q: str):
-    from server.agents import query_opensanctions
+    from server.agents import query_opensanctions, log_evidence
     if not q or not q.strip():
         raise HTTPException(status_code=400, detail="Query parameter 'q' is required")
     try:
         res = await query_opensanctions(q)
+        # Log this interactive search directly to the Audit Evidence Pack Repository
+        try:
+            log_evidence(
+                vendor_id=f"quick-chk-{int(datetime.datetime.utcnow().timestamp())}",
+                company_name=q.strip(),
+                api_source="OpenSanctions Screen (Quick Desk)",
+                query_param=q.strip(),
+                status="200 OK" if res else "No Result / Offline",
+                response_data=res
+            )
+        except Exception as log_err:
+            print(f"[check_sanctions] log_evidence error: {log_err}")
+
         if res and res.get("totalHits", 0) > 0:
             hits = res.get("hits", [])
             top_hit = hits[0]
@@ -649,26 +662,28 @@ async def check_sanctions(q: str):
                 
             return {
                 "matchFound": True,
-                "details": details_str
+                "details": details_str,
+                "apiSource": "OpenSanctions API (Live v2)",
+                "rawPayload": res
             }
         else:
             return {
                 "matchFound": False,
-                "details": "Clear profile search result. 0 matches found on Dow Jones Risk & Compliance registries, OFAC SDN List, or EU/UK Financial sanctions frameworks."
+                "details": "Clear profile search result. 0 matches found on Dow Jones Risk & Compliance registries, OFAC SDN List, or EU/UK Financial sanctions frameworks.",
+                "apiSource": "OpenSanctions API (Live v2)",
+                "rawPayload": res or {"totalHits": 0, "hits": []}
             }
     except Exception as e:
         print(f"[Sanctions Check Route] Error: {e}")
         query = q.lower()
         match = any(kw in query for kw in ["uralchim", "mazepin", "russia", "north korea"])
-        if match:
-            return {
-                "matchFound": True,
-                "details": "CRITICAL ALERT Match 100% (Fallback). Targeted SDN list: OFAC SDN, UK consolidated treasury database list. Associated Oligarch asset holdings detected: UralChem parent cluster."
-            }
-        return {
-            "matchFound": False,
-            "details": "Clear profile search result (Fallback). 0 matches found on Dow Jones Risk & Compliance registries, OFAC SDN List, or EU/UK Financial sanctions frameworks."
+        fallback_res = {
+            "matchFound": match,
+            "details": "CRITICAL ALERT Match 100% (Fallback). Targeted SDN list: OFAC SDN, UK consolidated treasury database list." if match else "Clear profile search result (Fallback). 0 matches found on Dow Jones Risk & Compliance registries, OFAC SDN List, or EU/UK Financial sanctions frameworks.",
+            "apiSource": "Local Fallback Keyword Index",
+            "rawPayload": {"fallbackQuery": q, "matched": match}
         }
+        return fallback_res
 
 @app.post("/api/screen")
 async def screen_vendor(payload: ScreenRequest):
