@@ -153,12 +153,16 @@ export default function MetricsDashboard({ vendors }: MetricsDashboardProps) {
         </div>
 
         <div className="flex justify-between text-[9px] font-bold text-slate-400 uppercase tracking-widest px-2 pt-2 border-t border-slate-50">
-          <span>Feb</span>
-          <span>Mar</span>
-          <span>Apr</span>
-          <span>May</span>
-          <span>Jun</span>
-          <span>Jul</span>
+          {(() => {
+            const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+            const currentMonthIndex = new Date().getMonth();
+            const last6 = [];
+            for (let i = 5; i >= 0; i--) {
+              const mIndex = (currentMonthIndex - i + 12) % 12;
+              last6.push(monthNames[mIndex]);
+            }
+            return last6.map((m, idx) => <span key={idx}>{m}</span>);
+          })()}
         </div>
       </div>
 
