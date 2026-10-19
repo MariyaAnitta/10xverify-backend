@@ -81,7 +81,7 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
       } else if (data.status === "Not_Found") {
         setSubmissionStatus("Not_Found");
         setDbVendor(null);
-        setIsSubmitted(false);
+        // Do NOT change activeStep so they remain on Step 3 to see the dismissal notice
         return false;
       }
       return false;
@@ -96,7 +96,7 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
       const hasRecord = await checkStatusAndLoad();
       if (hasRecord) return;
       
-      // If not submitted, fetch draft
+      // If no active submission/screened record found, fetch draft so form is prefilled
       try {
         const res = await fetch(`/api/vendor-portal/draft/${currentUser.email}`);
         const data = await res.json();
@@ -124,14 +124,15 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
 
   // Polling for Step 3 progress updates
   useEffect(() => {
-    if (!isSubmitted || activeStep !== 3) return;
+    // Keep polling while on step 3 as long as status is Queue
+    if (activeStep !== 3 || submissionStatus !== "Queue") return;
     
     const interval = setInterval(() => {
       checkStatusAndLoad();
-    }, 4500);
+    }, 3000);
     
     return () => clearInterval(interval);
-  }, [isSubmitted, activeStep]);
+  }, [activeStep, submissionStatus]);
 
   const handleSaveProgress = async () => {
     setLoading(true);
