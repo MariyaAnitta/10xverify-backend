@@ -42,6 +42,7 @@ export interface VendorDetails {
   solvencyStatus?: "Solvent" | "High Risk" | "Insolvent";
   creditScoreEst?: string; // e.g. "A+", "B", "C-"
   adverseMediaFound?: boolean;
+  contactEmail?: string;
 }
 
 export interface VendorScreening {
@@ -52,6 +53,7 @@ export interface VendorScreening {
   industry: string;
   screenedAt: string;
   screenedBy: string;
+  contactEmail?: string;
   status: "Pending" | "In Progress" | "Completed" | "Approved" | "Rejected";
   riskScore: number; // Weighted average (0 - 100)
   riskRating: RiskRating;
