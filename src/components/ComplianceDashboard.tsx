@@ -25,8 +25,17 @@ export default function ComplianceDashboard({ vendors, metrics, onVendorSelect }
 
     setLoading(true);
     setSanctionsResult(null);
-    try {
-      const response = await fetch(`/api/sanctions/check?q=${encodeURIComponent(sanctionsQuery)}`);
+      let userHeaders: Record<string, string> = {};
+      try {
+        const savedUser = JSON.parse(localStorage.getItem("10xverify_user") || "{}");
+        if (savedUser.role) userHeaders["X-User-Role"] = savedUser.role;
+        if (savedUser.email) userHeaders["X-User-Email"] = savedUser.email;
+        if (savedUser.name) userHeaders["X-User-Name"] = savedUser.name;
+      } catch {}
+
+      const response = await fetch(`/api/sanctions/check?q=${encodeURIComponent(sanctionsQuery)}`, {
+        headers: userHeaders
+      });
       if (response.ok) {
         const data = await response.json();
         setSanctionsResult({

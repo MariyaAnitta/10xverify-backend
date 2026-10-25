@@ -165,7 +165,17 @@ export default function VendorQueueDashboard({ onProcessVendor }: VendorQueueDas
                     const targetId = selectedSubmission._docId || selectedSubmission.contactEmail || selectedSubmission.email || selectedSubmission.id;
                     if (!window.confirm(`Are you sure you want to reject and remove the submission for ${selectedSubmission.companyName}?`)) return;
                     try {
-                      const res = await fetch(`/api/vendor-queue/${encodeURIComponent(targetId)}`, { method: "DELETE" });
+                      let headers: Record<string, string> = {};
+                      try {
+                        const savedUser = JSON.parse(localStorage.getItem("10xverify_user") || "{}");
+                        if (savedUser.role) headers["X-User-Role"] = savedUser.role;
+                        if (savedUser.email) headers["X-User-Email"] = savedUser.email;
+                        if (savedUser.name) headers["X-User-Name"] = savedUser.name;
+                      } catch {}
+                      const res = await fetch(`/api/vendor-queue/${encodeURIComponent(targetId)}`, { 
+                        method: "DELETE",
+                        headers 
+                      });
                       if (res.ok) {
                         setQueue(prev => prev.filter(item => (item._docId || item.contactEmail || item.email || item.id) !== targetId));
                         setSelectedSubmission(null);

@@ -93,3 +93,19 @@ export interface DashboardMetrics {
     date: string;
   }[];
 }
+
+export interface ActivityLog {
+  id: string;
+  timestamp: string;
+  date: string;
+  time: string;
+  userEmail: string;
+  userName: string;
+  userRole: string;
+  action: string;
+  target: string;
+  details: string;
+  ipAddress?: string;
+  status?: "SUCCESS" | "FAILED" | "SECURITY_BLOCKED";
+}
+

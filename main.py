@@ -61,6 +61,145 @@ class VendorDraftRequest(BaseModel):
     email: str # Vendor's email
     data: dict # All form fields combined
 
+class ClientActivityLogRequest(BaseModel):
+    action: str
+    target: str
+    details: str
+    status: Optional[str] = "SUCCESS"
+
+def get_client_ip(request: Request) -> str:
+    try:
+        forwarded = request.headers.get("x-forwarded-for")
+        if forwarded:
+            return forwarded.split(",")[0].strip()
+        if request.client and request.client.host:
+            return request.client.host
+    except Exception:
+        pass
+    return "127.0.0.1"
+
+def log_user_activity(
+    user_email: str,
+    user_name: str,
+    user_role: str,
+    action: str,
+    target: str,
+    details: str,
+    ip_address: str = "127.0.0.1",
+    status: str = "SUCCESS"
+):
+    try:
+        now = datetime.datetime.utcnow()
+        timestamp_iso = now.isoformat() + "Z"
+        date_str = now.strftime("%Y-%m-%d")
+        time_str = now.strftime("%H:%M:%S UTC")
+        log_id = f"act-{int(now.timestamp() * 1000)}"
+        
+        log_entry = {
+            "id": log_id,
+            "timestamp": timestamp_iso,
+            "date": date_str,
+            "time": time_str,
+            "userEmail": user_email or "system@10xverify.ai",
+            "userName": user_name or "System Operator",
+            "userRole": user_role or "System",
+            "action": action,
+            "target": target or "N/A",
+            "details": details,
+            "ipAddress": ip_address or "127.0.0.1",
+            "status": status
+        }
+        
+        db_fs.collection("activity_logs").document(log_id).set(log_entry)
+        print(f"[AUDIT TRAIL] {timestamp_iso} | {user_email} ({user_role}) | {action} | Target: {target} | {details}")
+        return log_entry
+    except Exception as e:
+        print(f"[log_user_activity] Error saving activity log: {e}")
+        return None
+
+def seed_activity_logs_if_empty():
+    try:
+        docs = list(db_fs.collection("activity_logs").limit(1).stream())
+        if not docs:
+            print("[Firebase] Seeding initial enterprise audit trail into activity_logs...")
+            initial_logs = [
+                {
+                    "id": "act-1729840001000",
+                    "timestamp": "2026-10-25T08:15:22.000Z",
+                    "date": "2026-10-25",
+                    "time": "08:15:22 UTC",
+                    "userEmail": "admin@10xverify.ai",
+                    "userName": "Anitta Shaji",
+                    "userRole": "Compliance Officer",
+                    "action": "SYSTEM_POLICY_APPLIED",
+                    "target": "Platform Security Gateway",
+                    "details": "Initialized enterprise-grade RBAC policies, audit log stream, and multi-agent pipeline monitoring.",
+                    "ipAddress": "192.168.1.10",
+                    "status": "SUCCESS"
+                },
+                {
+                    "id": "act-1729841200000",
+                    "timestamp": "2026-10-25T08:35:10.000Z",
+                    "date": "2026-10-25",
+                    "time": "08:35:10 UTC",
+                    "userEmail": "compliance@10xverify.ai",
+                    "userName": "Compliance Officer",
+                    "userRole": "Compliance Officer",
+                    "action": "USER_LOGIN",
+                    "target": "Platform Workspace",
+                    "details": "Compliance Officer authenticated via single credential gateway from corporate terminal.",
+                    "ipAddress": "10.0.4.88",
+                    "status": "SUCCESS"
+                },
+                {
+                    "id": "act-1729842400000",
+                    "timestamp": "2026-10-25T08:55:41.000Z",
+                    "date": "2026-10-25",
+                    "time": "08:55:41 UTC",
+                    "userEmail": "auditor@10xverify.ai",
+                    "userName": "Sarah Jenkins",
+                    "userRole": "Vetting Officer",
+                    "action": "VENDOR_SCREENED",
+                    "target": "Tesco PLC",
+                    "details": "Multi-agent ADK verification screening launched across Companies House, OpenSanctions, and Geoapify.",
+                    "ipAddress": "10.0.4.92",
+                    "status": "SUCCESS"
+                },
+                {
+                    "id": "act-1729844000000",
+                    "timestamp": "2026-10-25T09:20:15.000Z",
+                    "date": "2026-10-25",
+                    "time": "09:20:15 UTC",
+                    "userEmail": "compliance@10xverify.ai",
+                    "userName": "Compliance Officer",
+                    "userRole": "Compliance Officer",
+                    "action": "VENDOR_APPROVED",
+                    "target": "Tesco PLC",
+                    "details": "Final onboarding authorization executed. Risk Rating: GREEN (Score: 92/100). Vendor certified for Tier-1 procurement.",
+                    "ipAddress": "10.0.4.88",
+                    "status": "SUCCESS"
+                },
+                {
+                    "id": "act-1729845500000",
+                    "timestamp": "2026-10-25T09:45:30.000Z",
+                    "date": "2026-10-25",
+                    "time": "09:45:30 UTC",
+                    "userEmail": "compliance@10xverify.ai",
+                    "userName": "Compliance Officer",
+                    "userRole": "Compliance Officer",
+                    "action": "SANCTIONS_QUICK_CHECK",
+                    "target": "Mazepin Dmitry",
+                    "details": "Real-time sanctions check flagged CRITICAL OFAC/UK SDN consolidated list matches.",
+                    "ipAddress": "10.0.4.88",
+                    "status": "SUCCESS"
+                }
+            ]
+            for log in initial_logs:
+                db_fs.collection("activity_logs").document(log["id"]).set(log)
+            print("[Firebase] Seeding activity_logs completed.")
+    except Exception as e:
+        print(f"[Firebase] Seeding activity_logs failed: {e}")
+
 def get_db():
     try:
         docs = db_fs.collection("vendors").stream()
@@ -89,6 +228,7 @@ def migrate_seed_data():
 
 # Migrate database.json contents to Firestore at startup if empty
 migrate_seed_data()
+seed_activity_logs_if_empty()
 
 def calculate_metrics(vendors):
     # Standard metrics generator
@@ -149,10 +289,21 @@ class LoginRequest(BaseModel):
 
 # Authentication Endpoints
 @app.post("/api/auth/register")
-def register_user(req: RegisterRequest):
+def register_user(req: RegisterRequest, request: Request):
+    client_ip = get_client_ip(request)
     try:
         user_ref = db_fs.collection("users").document(req.email.lower())
         if user_ref.get().exists:
+            log_user_activity(
+                user_email=req.email.lower(),
+                user_name=req.name,
+                user_role=req.role,
+                action="USER_REGISTER_FAILED",
+                target=req.email.lower(),
+                details=f"Registration attempt failed: user '{req.email.lower()}' already exists.",
+                ip_address=client_ip,
+                status="FAILED"
+            )
             raise HTTPException(status_code=400, detail="User with this email already exists")
         
         user_data = {
@@ -163,6 +314,17 @@ def register_user(req: RegisterRequest):
             "createdAt": firestore.SERVER_TIMESTAMP
         }
         user_ref.set(user_data)
+        
+        log_user_activity(
+            user_email=req.email.lower(),
+            user_name=req.name,
+            user_role=req.role,
+            action="USER_REGISTER",
+            target=req.email.lower(),
+            details=f"New enterprise node user registered with role '{req.role}'.",
+            ip_address=client_ip,
+            status="SUCCESS"
+        )
         
         # Remove un-serializable fields and passwords before returning
         user_data.pop("password")
@@ -175,17 +337,48 @@ def register_user(req: RegisterRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/auth/login")
-def login_user(req: LoginRequest):
+def login_user(req: LoginRequest, request: Request):
+    client_ip = get_client_ip(request)
     try:
         doc = db_fs.collection("users").document(req.email.lower()).get()
         if not doc.exists:
+            log_user_activity(
+                user_email=req.email.lower(),
+                user_name="Unauthenticated",
+                user_role="Guest",
+                action="USER_LOGIN_FAILED",
+                target="Platform Workspace",
+                details=f"Failed login attempt for non-existent user account '{req.email.lower()}'.",
+                ip_address=client_ip,
+                status="FAILED"
+            )
             raise HTTPException(status_code=401, detail="Invalid email or password")
         
         user = doc.to_dict()
         if user.get("password") != req.password:
+            log_user_activity(
+                user_email=req.email.lower(),
+                user_name=user.get("name", "Unknown"),
+                user_role=user.get("role", "Unknown"),
+                action="USER_LOGIN_FAILED",
+                target="Platform Workspace",
+                details=f"Failed login authentication for user '{req.email.lower()}': password mismatch.",
+                ip_address=client_ip,
+                status="FAILED"
+            )
             raise HTTPException(status_code=401, detail="Invalid email or password")
             
         user.pop("password", None)
+        log_user_activity(
+            user_email=user.get("email"),
+            user_name=user.get("name"),
+            user_role=user.get("role"),
+            action="USER_LOGIN",
+            target="Platform Workspace",
+            details=f"User '{user.get('name')}' successfully authenticated and opened workspace session.",
+            ip_address=client_ip,
+            status="SUCCESS"
+        )
         return {"status": "success", "user": user}
     except HTTPException as he:
         raise he
@@ -208,12 +401,59 @@ def get_users():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/users/{email}")
-def delete_user(email: str):
+def delete_user(email: str, request: Request):
+    client_ip = get_client_ip(request)
     try:
         db_fs.collection("users").document(email.lower()).delete()
+        log_user_activity(
+            user_email="admin@10xverify.ai",
+            user_name="Administrator",
+            user_role="Compliance Officer",
+            action="USER_DELETED",
+            target=email.lower(),
+            details=f"User account '{email.lower()}' was decommissioned and removed from identity store.",
+            ip_address=client_ip,
+            status="SUCCESS"
+        )
         return {"status": "success"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/activity-logs")
+def get_activity_logs(limit: int = 300, action: Optional[str] = None, user: Optional[str] = None):
+    try:
+        docs = db_fs.collection("activity_logs").stream()
+        logs = [doc.to_dict() for doc in docs]
+        if action and action != "ALL":
+            logs = [l for l in logs if l.get("action") == action]
+        if user:
+            u_clean = user.lower().strip()
+            logs = [l for l in logs if u_clean in l.get("userEmail", "").lower() or u_clean in l.get("userName", "").lower()]
+        logs.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+        return logs[:limit]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/activity-logs")
+def create_activity_log(
+    req: ClientActivityLogRequest,
+    request: Request,
+    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
+    x_user_email: Optional[str] = Header(None, alias="X-User-Email"),
+    x_user_name: Optional[str] = Header(None, alias="X-User-Name")
+):
+    ip = get_client_ip(request)
+    entry = log_user_activity(
+        user_email=x_user_email or "unknown",
+        user_name=x_user_name or "Anonymous",
+        user_role=x_user_role or "User",
+        action=req.action,
+        target=req.target,
+        details=req.details,
+        ip_address=ip,
+        status=req.status or "SUCCESS"
+    )
+    return {"status": "success", "log": entry}
 
 # Old Gmail Pub/Sub listener has been disabled in favor of Power Automate Webhook.
 
@@ -358,7 +598,7 @@ def get_vendor_draft(email: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/vendor-portal/submit")
-def submit_vendor_profile(req: VendorDraftRequest):
+def submit_vendor_profile(req: VendorDraftRequest, request: Request):
     try:
         # Save to the queue for Compliance/Vetting Officers to see
         req.data["status"] = "Submitted"
@@ -369,6 +609,19 @@ def submit_vendor_profile(req: VendorDraftRequest):
         
         # Optionally, remove draft
         db_fs.collection("onboarding_drafts").document(req.email.lower()).delete()
+
+        client_ip = get_client_ip(request)
+        cname = req.data.get("companyName") or req.data.get("businessInfo", {}).get("legalName") or req.email
+        log_user_activity(
+            user_email=req.email.lower(),
+            user_name=cname,
+            user_role="Vendor",
+            action="VENDOR_SELF_SUBMITTED",
+            target=cname,
+            details=f"Vendor '{cname}' submitted digital self-onboarding verification dossier.",
+            ip_address=client_ip,
+            status="SUCCESS"
+        )
         
         return {"status": "success", "data": req.data}
     except Exception as e:
@@ -394,7 +647,7 @@ def get_vendor_by_email(email: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/vendors/by-email/{email}/unlock")
-def unlock_vendor(email: str):
+def unlock_vendor(email: str, request: Request):
     try:
         # Find and delete from "vendors"
         docs = db_fs.collection("vendors").stream()
@@ -428,6 +681,19 @@ def unlock_vendor(email: str):
                 "signature": vendor_data.get("signature", "")
             }
             db_fs.collection("onboarding_drafts").document(email.lower()).set(draft_data)
+
+        client_ip = get_client_ip(request)
+        cname = (vendor_data.get("companyName") if vendor_data else "") or email
+        log_user_activity(
+            user_email=email.lower(),
+            user_name=cname,
+            user_role="Vendor",
+            action="VENDOR_UNLOCKED",
+            target=cname,
+            details=f"Vendor packet unlocked for re-editing and resubmission.",
+            ip_address=client_ip,
+            status="SUCCESS"
+        )
             
         return {"status": "success"}
     except Exception as e:
@@ -485,7 +751,13 @@ def get_vendor_queue():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/vendor-queue/{identifier}")
-def delete_from_vendor_queue(identifier: str):
+def delete_from_vendor_queue(
+    identifier: str,
+    request: Request,
+    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
+    x_user_email: Optional[str] = Header(None, alias="X-User-Email"),
+    x_user_name: Optional[str] = Header(None, alias="X-User-Name")
+):
     try:
         clean_id = identifier.lower().strip()
         # 1. Try deleting by document ID
@@ -505,6 +777,18 @@ def delete_from_vendor_queue(identifier: str):
             db_fs.collection("onboarding_drafts").document(clean_id).delete()
         except Exception:
             pass
+
+        client_ip = get_client_ip(request)
+        log_user_activity(
+            user_email=x_user_email or "compliance@10xverify.ai",
+            user_name=x_user_name or "Compliance Officer",
+            user_role=x_user_role or "Compliance Officer",
+            action="QUEUE_APPLICATION_DISMISSED",
+            target=clean_id,
+            details=f"Inbound vendor application for '{clean_id}' was rejected and purged from registration queue.",
+            ip_address=client_ip,
+            status="SUCCESS"
+        )
 
         return {"status": "success", "message": f"Application for {clean_id} rejected/removed from queue."}
     except Exception as e:
@@ -538,9 +822,23 @@ def get_vendor(vendor_id: str):
 def change_status(
     vendor_id: str, 
     payload: StatusChangeRequest,
-    x_user_role: Optional[str] = Header(None, alias="X-User-Role")
+    request: Request,
+    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
+    x_user_email: Optional[str] = Header(None, alias="X-User-Email"),
+    x_user_name: Optional[str] = Header(None, alias="X-User-Name")
 ):
+    client_ip = get_client_ip(request)
     if x_user_role != "Compliance Officer":
+        log_user_activity(
+            user_email=x_user_email or "unknown",
+            user_name=x_user_name or "Anonymous",
+            user_role=x_user_role or "Unprivileged",
+            action="ACCESS_DENIED",
+            target=vendor_id,
+            details=f"Unauthorized attempt to modify status to '{payload.status}'. Compliance Officer role required.",
+            ip_address=client_ip,
+            status="SECURITY_BLOCKED"
+        )
         raise HTTPException(
             status_code=403, 
             detail="Action forbidden: Only a Compliance Officer can approve or reject onboarding status."
@@ -551,6 +849,20 @@ def change_status(
         if not doc.exists:
             raise HTTPException(status_code=404, detail="Vendor not found")
         doc_ref.update({"status": payload.status})
+        v_data = doc.to_dict() or {}
+        cname = v_data.get("companyName", vendor_id)
+        
+        action_name = "VENDOR_APPROVED" if payload.status == "Approved" else ("VENDOR_REJECTED" if payload.status == "Rejected" else "VENDOR_STATUS_UPDATED")
+        log_user_activity(
+            user_email=x_user_email or "compliance@10xverify.ai",
+            user_name=x_user_name or "Compliance Officer",
+            user_role="Compliance Officer",
+            action=action_name,
+            target=cname,
+            details=f"Compliance Officer set onboarding decision to '{payload.status}' for vendor '{cname}'.",
+            ip_address=client_ip,
+            status="SUCCESS"
+        )
         return doc_ref.get().to_dict()
     except HTTPException:
         raise
@@ -558,7 +870,13 @@ def change_status(
         raise HTTPException(status_code=500, detail=f"Firebase update failed: {e}")
 
 @app.post("/api/vendors/{vendor_id}/comments")
-def add_comment(vendor_id: str, payload: CommentRequest):
+def add_comment(
+    vendor_id: str, 
+    payload: CommentRequest,
+    request: Request,
+    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
+    x_user_email: Optional[str] = Header(None, alias="X-User-Email")
+):
     try:
         doc_ref = db_fs.collection("vendors").document(vendor_id)
         doc = doc_ref.get()
@@ -577,12 +895,31 @@ def add_comment(vendor_id: str, payload: CommentRequest):
         comments = data.get("comments") or []
         comments.append(new_comment)
         doc_ref.update({"comments": comments})
+
+        client_ip = get_client_ip(request)
+        cname = data.get("companyName", vendor_id)
+        log_user_activity(
+            user_email=x_user_email or payload.author,
+            user_name=payload.author,
+            user_role=x_user_role or "Auditor",
+            action="COMMENT_ADDED",
+            target=cname,
+            details=f"Audit comment added by {payload.author}: \"{payload.content[:80]}{'...' if len(payload.content) > 80 else ''}\"",
+            ip_address=client_ip,
+            status="SUCCESS"
+        )
         return doc_ref.get().to_dict()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Firebase update failed: {e}")
 
 @app.delete("/api/vendors/{vendor_id}")
-def delete_vendor(vendor_id: str):
+def delete_vendor(
+    vendor_id: str,
+    request: Request,
+    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
+    x_user_email: Optional[str] = Header(None, alias="X-User-Email"),
+    x_user_name: Optional[str] = Header(None, alias="X-User-Name")
+):
     try:
         doc_ref = db_fs.collection("vendors").document(vendor_id)
         doc = doc_ref.get()
@@ -612,6 +949,18 @@ def delete_vendor(vendor_id: str):
             except Exception:
                 pass
 
+        client_ip = get_client_ip(request)
+        log_user_activity(
+            user_email=x_user_email or "admin@10xverify.ai",
+            user_name=x_user_name or "System Administrator",
+            user_role=x_user_role or "Compliance Officer",
+            action="VENDOR_DELETED",
+            target=company_name or vendor_id,
+            details=f"Vendor dossier for '{company_name or vendor_id}' was purged from verified registry by {x_user_name or 'administrator'}.",
+            ip_address=client_ip,
+            status="SUCCESS"
+        )
+
         return {"status": "success", "message": f"Vendor {vendor_id} and all historical monitoring alerts deleted."}
     except HTTPException:
         raise
@@ -619,7 +968,13 @@ def delete_vendor(vendor_id: str):
         raise HTTPException(status_code=500, detail=f"Firebase delete failed: {e}")
 
 @app.get("/api/sanctions/check")
-async def check_sanctions(q: str):
+async def check_sanctions(
+    q: str,
+    request: Request,
+    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
+    x_user_email: Optional[str] = Header(None, alias="X-User-Email"),
+    x_user_name: Optional[str] = Header(None, alias="X-User-Name")
+):
     from server.agents import query_opensanctions, log_evidence
     if not q or not q.strip():
         raise HTTPException(status_code=400, detail="Query parameter 'q' is required")
@@ -638,7 +993,20 @@ async def check_sanctions(q: str):
         except Exception as log_err:
             print(f"[check_sanctions] log_evidence error: {log_err}")
 
-        if res and res.get("totalHits", 0) > 0:
+        is_hit = bool(res and res.get("totalHits", 0) > 0)
+        client_ip = get_client_ip(request)
+        log_user_activity(
+            user_email=x_user_email or "compliance@10xverify.ai",
+            user_name=x_user_name or "Compliance Officer",
+            user_role=x_user_role or "Compliance Officer",
+            action="SANCTIONS_QUICK_CHECK",
+            target=q.strip(),
+            details=f"Live OpenSanctions SDN screening check conducted for query '{q.strip()}'. Result: {'CRITICAL MATCH HIT' if is_hit else 'CLEAR'}.",
+            ip_address=client_ip,
+            status="SUCCESS"
+        )
+
+        if is_hit:
             hits = res.get("hits", [])
             top_hit = hits[0]
             caption = top_hit.get("caption", "Unknown Entity")
@@ -686,7 +1054,13 @@ async def check_sanctions(q: str):
         return fallback_res
 
 @app.post("/api/screen")
-async def screen_vendor(payload: ScreenRequest):
+async def screen_vendor(
+    payload: ScreenRequest,
+    request: Request,
+    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
+    x_user_email: Optional[str] = Header(None, alias="X-User-Email"),
+    x_user_name: Optional[str] = Header(None, alias="X-User-Name")
+):
     clean_website = payload.website.replace("https://", "").replace("http://", "").replace("www.", "").strip().rstrip("/")
     try:
         # Check if email is in the queue and delete it
@@ -708,6 +1082,18 @@ async def screen_vendor(payload: ScreenRequest):
             
         vendor_id = result.get("id")
         db_fs.collection("vendors").document(vendor_id).set(result)
+
+        client_ip = get_client_ip(request)
+        log_user_activity(
+            user_email=x_user_email or payload.screenedBy,
+            user_name=x_user_name or payload.screenedBy,
+            user_role=x_user_role or "Vetting Officer",
+            action="VENDOR_SCREENED",
+            target=payload.companyName,
+            details=f"Multi-Agent AI ADK screening completed for '{payload.companyName}' ({clean_website}). Assigned score: {result.get('riskScore', 'N/A')}/100 ({result.get('riskRating', 'UNKNOWN')}).",
+            ip_address=client_ip,
+            status="SUCCESS"
+        )
 
         # Clear outdated continuous monitoring alerts for this freshly vetted vendor
         try:

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Shield, Brain, Sparkles, Database, HelpCircle, Activity, LayoutGrid, CheckSquare, Settings, ClipboardList } from "lucide-react";
+import { Shield, Brain, Sparkles, Database, HelpCircle, Activity, LayoutGrid, CheckSquare, Settings, ClipboardList, ShieldCheck } from "lucide-react";
 import { VendorScreening, DashboardMetrics } from "./types";
 import ExecutiveDashboard from "./components/ExecutiveDashboard";
 import ProcurementDashboard from "./components/ProcurementDashboard";
@@ -11,6 +11,7 @@ import VendorPortal from "./components/VendorPortal";
 import VendorQueueDashboard from "./components/VendorQueueDashboard";
 import EvidenceRepository from "./components/EvidenceRepository";
 import MetricsDashboard from "./components/MetricsDashboard";
+import ActivityLogsDashboard from "./components/ActivityLogsDashboard";
 
 interface UserProfile {
   email: string;
@@ -26,7 +27,7 @@ const DEFAULT_USERS: UserProfile[] = [
 export default function App() {
   const [vendors, setVendors] = useState<VendorScreening[]>([]);
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
-  const [activeTab, setActiveTab] = useState<"executive" | "procurement" | "compliance" | "screen" | "vendor-queue" | "evidence" | "metrics">("executive");
+  const [activeTab, setActiveTab] = useState<"executive" | "procurement" | "compliance" | "screen" | "vendor-queue" | "evidence" | "metrics" | "activity-logs">("executive");
   const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null);
   const [autoStartVendor, setAutoStartVendor] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -156,7 +157,9 @@ export default function App() {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
-          "X-User-Role": currentUser?.role || ""
+          "X-User-Role": currentUser?.role || "",
+          "X-User-Email": currentUser?.email || "",
+          "X-User-Name": currentUser?.name || ""
         },
         body: JSON.stringify({ status })
       });
@@ -180,7 +183,11 @@ export default function App() {
     try {
       const response = await fetch(`/api/vendors/${id}/comments`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "X-User-Role": currentUser?.role || "",
+          "X-User-Email": currentUser?.email || ""
+        },
         body: JSON.stringify(comment)
       });
       if (response.ok) {
@@ -201,7 +208,12 @@ export default function App() {
     if (!window.confirm("Are you sure you want to permanently delete this vendor record?")) return;
     try {
       const response = await fetch(`/api/vendors/${id}`, {
-        method: "DELETE"
+        method: "DELETE",
+        headers: {
+          "X-User-Role": currentUser?.role || "",
+          "X-User-Email": currentUser?.email || "",
+          "X-User-Name": currentUser?.name || ""
+        }
       });
       if (response.ok) {
         const targetVendor = vendors.find(v => v.id === id);
@@ -281,7 +293,8 @@ export default function App() {
             { id: "metrics", label: "Risk Metrics", desc: "Platform analytics", icon: Activity },
             { id: "screen", label: "Workforce Screening", desc: "Deploy AI Agents", icon: Brain },
             { id: "vendor-queue", label: "Vendor Portal Queue", desc: "Audit registrations", icon: ClipboardList },
-            { id: "evidence", label: "Evidence Logs", desc: "Audit registry pack", icon: Database }
+            { id: "evidence", label: "Evidence Logs", desc: "Audit registry pack", icon: Database },
+            { id: "activity-logs", label: "User Activity Logs", desc: "Audit trail & security", icon: ShieldCheck }
           ].map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id && !selectedVendorId;
@@ -391,6 +404,10 @@ export default function App() {
 
                 {activeTab === "evidence" && (
                   <EvidenceRepository />
+                )}
+
+                {activeTab === "activity-logs" && (
+                  <ActivityLogsDashboard />
                 )}
               </>
             )}
