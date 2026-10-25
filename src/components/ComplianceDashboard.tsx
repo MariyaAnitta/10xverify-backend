@@ -25,6 +25,7 @@ export default function ComplianceDashboard({ vendors, metrics, onVendorSelect }
 
     setLoading(true);
     setSanctionsResult(null);
+    try {
       let userHeaders: Record<string, string> = {};
       try {
         const savedUser = JSON.parse(localStorage.getItem("10xverify_user") || "{}");
