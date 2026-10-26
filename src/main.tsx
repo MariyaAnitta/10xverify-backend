@@ -7,7 +7,8 @@ import { MsalProvider } from '@azure/msal-react';
 
 async function bootstrap() {
   try {
-    if (import.meta.env.VITE_AZURE_CLIENT_ID) {
+    const clientId = ((import.meta as any).env?.VITE_AZURE_CLIENT_ID);
+    if (clientId) {
       await msalInstance.initialize();
       await msalInstance.handleRedirectPromise();
     }

@@ -2,15 +2,13 @@ import { Configuration, LogLevel, PublicClientApplication } from "@azure/msal-br
 
 export const msalConfig: Configuration = {
   auth: {
-    clientId: import.meta.env.VITE_AZURE_CLIENT_ID || "",
-    authority: `https://login.microsoftonline.com/${import.meta.env.VITE_AZURE_TENANT_ID || "common"}`,
+    clientId: ((import.meta as any).env?.VITE_AZURE_CLIENT_ID) || "",
+    authority: `https://login.microsoftonline.com/${((import.meta as any).env?.VITE_AZURE_TENANT_ID) || "common"}`,
     redirectUri: window.location.origin,
     postLogoutRedirectUri: window.location.origin,
-    navigateToLoginRequestUrl: true,
   },
   cache: {
     cacheLocation: "sessionStorage",
-    storeAuthStateInCookie: false,
   },
   system: {
     loggerOptions: {
