@@ -11,6 +11,8 @@
     "start": ".venv\\Scripts\\python main.py"
   },
   "dependencies": {
+    "@azure/msal-browser": "^5.26.0",
+    "@azure/msal-react": "^5.7.3",
     "@google/adk": "^1.0.1",
     "@google/genai": "^1.52.0",
     "axios": "^1.18.0",

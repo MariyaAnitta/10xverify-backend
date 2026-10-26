@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { Shield, Lock, User, Mail, Database } from "lucide-react";
+import { msalInstance, loginRequest } from "../authConfig";
 
 interface AuthScreenProps {
   onLogin: (user: any) => void;
@@ -13,6 +14,57 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
   const [role, setRole] = useState<"Admin Policy" | "Auditor Desk" | "Vendor Node">("Vendor Node");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [ssoLoading, setSsoLoading] = useState(false);
+
+  const handleMicrosoftLogin = async () => {
+    setError("");
+    setSsoLoading(true);
+    try {
+      // 1. Trigger Microsoft Entra ID popup
+      const response = await msalInstance.loginPopup(loginRequest);
+      if (!response || !response.account) {
+        throw new Error("Microsoft authentication did not return account data.");
+      }
+
+      const account = response.account;
+      const userEmail = (account.username || (account.idTokenClaims as any)?.preferred_username || (account.idTokenClaims as any)?.email || "").toLowerCase();
+      const userName = account.name || userEmail.split("@")[0] || "10xDS Officer";
+
+      // 2. Register / verify session with backend
+      const res = await fetch("/api/auth/azure-sso", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          email: userEmail,
+          name: userName,
+          role: "Compliance Officer",
+          tenantId: account.tenantId,
+          homeAccountId: account.homeAccountId
+        })
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.detail || "SSO session creation failed");
+
+      // 3. Complete login
+      const loggedInUser = {
+        email: data.user.email,
+        name: data.user.name,
+        role: data.user.role || "Compliance Officer"
+      };
+
+      onLogin(loggedInUser);
+    } catch (err: any) {
+      console.error("Microsoft SSO Error:", err);
+      if (err.name === "BrowserAuthError" && err.errorCode === "user_cancelled") {
+        setError("Microsoft login was cancelled.");
+      } else {
+        setError(err.message || "Microsoft Entra ID authentication failed.");
+      }
+    } finally {
+      setSsoLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -116,6 +168,40 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
               </button>
             </div>
           </div>
+
+          {/* Microsoft SSO Section for Internal Staff */}
+          {isLogin && (
+            <div className="space-y-3 mb-6">
+              <button
+                type="button"
+                onClick={handleMicrosoftLogin}
+                disabled={ssoLoading}
+                className="w-full bg-[#161f30] hover:bg-[#1e2a42] border border-slate-700 hover:border-slate-500 text-white font-bold py-3.5 px-4 rounded-xl transition-all text-sm flex items-center justify-center gap-3 shadow-md group cursor-pointer disabled:opacity-50"
+              >
+                {/* Official Microsoft 4-Color Logo */}
+                <svg className="w-5 h-5 shrink-0" viewBox="0 0 21 21" fill="none">
+                  <rect x="1" y="1" width="9" height="9" fill="#F25022"/>
+                  <rect x="11" y="1" width="9" height="9" fill="#7FBA00"/>
+                  <rect x="1" y="11" width="9" height="9" fill="#00A4EF"/>
+                  <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
+                </svg>
+                <span>
+                  {ssoLoading ? "Connecting to Microsoft Entra ID..." : "Sign in with Microsoft (10xDS SSO)"}
+                </span>
+              </button>
+              <p className="text-[11px] text-slate-400 text-center">
+                For internal 10xDS Compliance Officers, Vetting Officers, and Admins.
+              </p>
+
+              <div className="relative flex py-2 items-center">
+                <div className="flex-grow border-t border-slate-800"></div>
+                <span className="shrink mx-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+                  Or continue with credentials / vendor portal
+                </span>
+                <div className="flex-grow border-t border-slate-800"></div>
+              </div>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             

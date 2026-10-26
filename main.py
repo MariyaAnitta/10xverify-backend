@@ -287,6 +287,14 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
+class AzureSSORequest(BaseModel):
+    email: str
+    name: str
+    role: Optional[str] = "Compliance Officer"
+    tenantId: Optional[str] = None
+    homeAccountId: Optional[str] = None
+
+
 # Authentication Endpoints
 @app.post("/api/auth/register")
 def register_user(req: RegisterRequest, request: Request):
@@ -384,6 +392,53 @@ def login_user(req: LoginRequest, request: Request):
         raise he
     except Exception as e:
         print(f"Login Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/auth/azure-sso")
+def login_azure_sso(req: AzureSSORequest, request: Request):
+    client_ip = get_client_ip(request)
+    try:
+        user_ref = db_fs.collection("users").document(req.email.lower())
+        user_doc = user_ref.get()
+        
+        user_role = req.role or "Compliance Officer"
+        if user_doc.exists:
+            existing = user_doc.to_dict()
+            if existing.get("role"):
+                user_role = existing.get("role")
+        else:
+            # First time logging in with Azure SSO, persist in users collection
+            user_data = {
+                "email": req.email.lower(),
+                "name": req.name,
+                "role": user_role,
+                "authProvider": "microsoft_entra_id",
+                "createdAt": firestore.SERVER_TIMESTAMP
+            }
+            user_ref.set(user_data)
+            
+        log_user_activity(
+            user_email=req.email.lower(),
+            user_name=req.name,
+            user_role=user_role,
+            action="USER_LOGIN_AZURE_SSO",
+            target="Platform Workspace",
+            details=f"User '{req.name}' successfully authenticated via Microsoft Entra ID (Single Sign-On).",
+            ip_address=client_ip,
+            status="SUCCESS"
+        )
+        
+        return {
+            "status": "success",
+            "user": {
+                "email": req.email.lower(),
+                "name": req.name,
+                "role": user_role,
+                "authProvider": "microsoft_entra_id"
+            }
+        }
+    except Exception as e:
+        print(f"Azure SSO Login Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/users")
