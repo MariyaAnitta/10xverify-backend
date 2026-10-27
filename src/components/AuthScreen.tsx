@@ -11,7 +11,7 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [role, setRole] = useState<"Admin Policy" | "Auditor Desk" | "Vendor Node">("Vendor Node");
+  const [role] = useState<"Vendor Node">("Vendor Node");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [ssoLoading, setSsoLoading] = useState(false);
@@ -75,7 +75,7 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
       const endpoint = isLogin ? "/api/auth/login" : "/api/auth/register";
       const payload = isLogin 
         ? { email, password } 
-        : { email, password, name, role };
+        : { email, password, name, role: "Vendor Node" };
 
       const res = await fetch(endpoint, {
         method: "POST",
@@ -109,7 +109,7 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
       {/* Left side branding */}
       <div className="hidden lg:flex w-1/3 flex-col justify-center px-12 border-r border-slate-800/50">
         <div className="inline-flex items-center gap-2 bg-emerald-500/10 text-emerald-400 text-xs font-bold px-3 py-1 rounded-full w-max mb-8 border border-emerald-500/20 uppercase tracking-widest">
-          Secure Workflow Interface
+          Enterprise Security Gateway
         </div>
         <h1 className="text-5xl font-extrabold text-white tracking-tight mb-4 flex items-center gap-3">
           10xVerify<span className="text-emerald-400">.AI</span>
@@ -141,42 +141,57 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
       <div className="w-full lg:w-2/3 flex flex-col justify-center px-6 md:px-24">
         
         <div className="max-w-2xl w-full mx-auto">
-          <div className="flex items-center justify-between mb-10">
+          <div className="flex items-center justify-between mb-8">
             <div>
               <h2 className="text-3xl font-bold text-white mb-2">
-                {isLogin ? "Access Platform Workspace" : "Deploy Audited Node"}
+                {isLogin ? "Access Platform Workspace" : "Vendor Self-Registration Portal"}
               </h2>
               <p className="text-slate-400 text-sm">
-                {isLogin ? "Sign in to access your customized dashboard gateway" : "Create your official account on the distributed verification ledger"}
+                {isLogin 
+                  ? "Sign in with 10xDS Corporate SSO (Internal) or Vendor Credentials (External)" 
+                  : "Register your company to submit due diligence filings and onboarding documentation"}
               </p>
             </div>
             
-            <div className="flex bg-[#121927] p-1 rounded-2xl border border-slate-800">
+            <div className="flex bg-[#121927] p-1 rounded-2xl border border-slate-800 shrink-0">
               <button 
                 type="button"
-                onClick={() => setIsLogin(true)}
-                className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${isLogin ? 'bg-[#1e2638] text-emerald-400 shadow-md' : 'text-slate-400 hover:text-white'}`}
+                onClick={() => { setIsLogin(true); setError(""); }}
+                className={`px-5 py-2 rounded-xl text-sm font-bold transition-all ${isLogin ? 'bg-[#1e2638] text-emerald-400 shadow-md' : 'text-slate-400 hover:text-white'}`}
               >
                 Sign In
               </button>
               <button 
                 type="button"
-                onClick={() => setIsLogin(false)}
-                className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${!isLogin ? 'bg-[#1e2638] text-emerald-400 shadow-md' : 'text-slate-400 hover:text-white'}`}
+                onClick={() => { setIsLogin(false); setError(""); }}
+                className={`px-5 py-2 rounded-xl text-sm font-bold transition-all ${!isLogin ? 'bg-[#1e2638] text-emerald-400 shadow-md' : 'text-slate-400 hover:text-white'}`}
               >
-                Register
+                Vendor Register
               </button>
             </div>
           </div>
 
-          {/* Microsoft SSO Section for Internal Staff */}
+          {/* Microsoft SSO Section for Internal Staff on Sign In Tab */}
           {isLogin && (
-            <div className="space-y-3 mb-6">
+            <div className="space-y-3 mb-6 bg-[#121927]/60 p-5 rounded-2xl border border-slate-800">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[11px] font-bold text-slate-300 uppercase tracking-widest flex items-center gap-2">
+                  <Shield className="w-3.5 h-3.5 text-blue-400" />
+                  10xDS Internal Staff Access
+                </span>
+                <span className="text-[10px] bg-blue-500/10 text-blue-400 font-semibold px-2 py-0.5 rounded-full border border-blue-500/20">
+                  Entra ID SSO
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                Compliance Officers, Vetting Officers, and Platform Admins sign in directly with their corporate Microsoft account.
+              </p>
+
               <button
                 type="button"
                 onClick={handleMicrosoftLogin}
                 disabled={ssoLoading}
-                className="w-full bg-[#161f30] hover:bg-[#1e2a42] border border-slate-700 hover:border-slate-500 text-white font-bold py-3.5 px-4 rounded-xl transition-all text-sm flex items-center justify-center gap-3 shadow-md group cursor-pointer disabled:opacity-50"
+                className="w-full bg-[#161f30] hover:bg-[#1e2a42] border border-blue-500/30 hover:border-blue-400/60 text-white font-bold py-3.5 px-4 rounded-xl transition-all text-sm flex items-center justify-center gap-3 shadow-md group cursor-pointer disabled:opacity-50 mt-2"
               >
                 {/* Official Microsoft 4-Color Logo */}
                 <svg className="w-5 h-5 shrink-0" viewBox="0 0 21 21" fill="none">
@@ -189,21 +204,29 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
                   {ssoLoading ? "Connecting to Microsoft Entra ID..." : "Sign in with Microsoft (10xDS SSO)"}
                 </span>
               </button>
-              <p className="text-[11px] text-slate-400 text-center">
-                For internal 10xDS Compliance Officers, Vetting Officers, and Admins.
-              </p>
 
-              <div className="relative flex py-2 items-center">
+              <div className="relative flex py-2 items-center pt-4">
                 <div className="flex-grow border-t border-slate-800"></div>
                 <span className="shrink mx-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                  Or continue with credentials / vendor portal
+                  Or External Vendor Portal Login
                 </span>
                 <div className="flex-grow border-t border-slate-800"></div>
               </div>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Banner for Internal Staff on Register Tab */}
+          {!isLogin && (
+            <div className="mb-6 p-4 rounded-xl bg-blue-950/30 border border-blue-800/40 flex items-start gap-3">
+              <Shield className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
+              <div className="text-xs leading-relaxed text-slate-300">
+                <strong className="text-blue-300 font-bold block mb-0.5">Are you a 10xDS Officer or Team Member?</strong>
+                Internal staff members do not need to register with a password. Switch to the <button type="button" onClick={() => setIsLogin(true)} className="text-blue-400 underline font-semibold hover:text-blue-300">Sign In tab</button> and click <strong>"Sign in with Microsoft (10xDS SSO)"</strong> to access with corporate credentials.
+              </div>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-5">
             
             {error && (
               <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-sm text-red-400 font-medium">
@@ -211,25 +234,46 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              {!isLogin && (
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">
+                    Company Legal Name & Contact Person
+                  </label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
+                    <input
+                      type="text"
+                      required
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      placeholder="e.g. Apex Global Logistics (John Doe)"
+                      className="w-full bg-[#121927] border border-slate-700/60 rounded-xl pl-12 pr-4 py-3.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/50 transition-all"
+                    />
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2 md:col-span-2">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Username / Login ID (Email)</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">
+                  {isLogin ? "Username / Vendor Email" : "Official Company Work Email"}
+                </label>
                 <div className="relative">
-                  <User className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
+                  <Mail className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
                   <input
                     type="email"
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="e.g. anitta_compliance@company.com"
+                    placeholder={isLogin ? "e.g. vendor_contact@supplier.com" : "e.g. compliance@yourcompany.com"}
                     className="w-full bg-[#121927] border border-slate-700/60 rounded-xl pl-12 pr-4 py-3.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/50 transition-all"
                   />
                 </div>
-                {!isLogin && <p className="text-[10px] text-slate-500 pl-1">Your unique node identifier. Only valid emails are allowed.</p>}
+                {!isLogin && <p className="text-[10px] text-slate-500 pl-1">This corporate email will serve as your vendor verification ID.</p>}
               </div>
 
               <div className="space-y-2 md:col-span-2">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Password / Access Key</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Password</label>
                 <div className="relative">
                   <Lock className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
                   <input
@@ -237,65 +281,21 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter security passcode"
+                    placeholder="Enter secure password"
                     className="w-full bg-[#121927] border border-slate-700/60 rounded-xl pl-12 pr-4 py-3.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/50 transition-all"
                   />
                 </div>
-                {!isLogin && <p className="text-[10px] text-slate-500 pl-1">Passwords provide node encryption.</p>}
               </div>
-
-              {!isLogin && (
-                <>
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">Full Name / Company Title</label>
-                    <input
-                      type="text"
-                      required
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      placeholder="e.g. Marie Anitta"
-                      className="w-full bg-[#121927] border border-slate-700/60 rounded-xl px-4 py-3.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/50 transition-all"
-                    />
-                  </div>
-                </>
-              )}
             </div>
-
-            {!isLogin && (
-              <div className="pt-4">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1 block mb-3">Select Functional Node Role</label>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <RoleCard 
-                    title="Auditor Desk" 
-                    subtitle="Vetting Officer" 
-                    desc="Review, run AI agents, add audit logs" 
-                    active={role === "Auditor Desk"} 
-                    onClick={() => setRole("Auditor Desk")} 
-                  />
-                  <RoleCard 
-                    title="Admin Policy" 
-                    subtitle="Compliance Officer" 
-                    desc="Oversee metrics, approve or reject vendors" 
-                    active={role === "Admin Policy"} 
-                    onClick={() => setRole("Admin Policy")} 
-                  />
-                  <RoleCard 
-                    title="Vendor Portal" 
-                    subtitle="Vendor" 
-                    desc="Submit bank details, tax forms, compliance docs" 
-                    active={role === "Vendor Node"} 
-                    onClick={() => setRole("Vendor Node")} 
-                  />
-                </div>
-              </div>
-            )}
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-4 px-4 rounded-xl transition-colors mt-6 text-sm flex items-center justify-center gap-2 disabled:opacity-50"
+              className="w-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black py-4 px-4 rounded-xl transition-colors mt-4 text-sm flex items-center justify-center gap-2 disabled:opacity-50 cursor-pointer shadow-lg shadow-emerald-500/10"
             >
-              {loading ? "Processing..." : (isLogin ? "Access Workspace Terminal →" : "Deploy Audited Ledger Node →")}
+              {loading 
+                ? "Processing..." 
+                : (isLogin ? "Sign In to Vendor Workspace →" : "Create Vendor Account & Continue →")}
             </button>
 
           </form>

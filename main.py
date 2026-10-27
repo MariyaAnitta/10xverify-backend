@@ -314,11 +314,15 @@ def register_user(req: RegisterRequest, request: Request):
             )
             raise HTTPException(status_code=400, detail="User with this email already exists")
         
+        # Enforce that public self-registration is strictly for Vendors.
+        # Internal roles (Compliance Officer / Vetting Officer) must authenticate via Microsoft Entra ID SSO.
+        enforced_role = "Vendor Node"
+        
         user_data = {
             "email": req.email.lower(),
             "password": req.password, # In a real app, hash this with bcrypt!
             "name": req.name,
-            "role": req.role,
+            "role": enforced_role,
             "createdAt": firestore.SERVER_TIMESTAMP
         }
         user_ref.set(user_data)
@@ -326,10 +330,10 @@ def register_user(req: RegisterRequest, request: Request):
         log_user_activity(
             user_email=req.email.lower(),
             user_name=req.name,
-            user_role=req.role,
-            action="USER_REGISTER",
+            user_role=enforced_role,
+            action="USER_REGISTER_VENDOR",
             target=req.email.lower(),
-            details=f"New enterprise node user registered with role '{req.role}'.",
+            details=f"New vendor self-registration account created for '{req.name}'.",
             ip_address=client_ip,
             status="SUCCESS"
         )
