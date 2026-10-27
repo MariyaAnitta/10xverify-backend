@@ -4,7 +4,7 @@ export const msalConfig: Configuration = {
   auth: {
     clientId: ((import.meta as any).env?.VITE_AZURE_CLIENT_ID) || "",
     authority: `https://login.microsoftonline.com/${((import.meta as any).env?.VITE_AZURE_TENANT_ID) || "common"}`,
-    redirectUri: window.location.origin,
+    redirectUri: `${window.location.origin}/api/auth/callback/azure-ad`,
     postLogoutRedirectUri: window.location.origin,
   },
   cache: {

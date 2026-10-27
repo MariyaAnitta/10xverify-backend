@@ -440,6 +440,14 @@ def login_user(req: LoginRequest, request: Request):
         print(f"Login Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+@app.get("/api/auth/callback/azure-ad")
+def azure_ad_callback():
+    dist_dir = os.path.join(os.getcwd(), "dist")
+    index_file = os.path.join(dist_dir, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    return HTMLResponse("<html><head><script>window.close();</script></head><body>Redirecting to application...</body></html>")
+
 @app.post("/api/auth/azure-sso")
 def login_azure_sso(req: AzureSSORequest, request: Request):
     client_ip = get_client_ip(request)
