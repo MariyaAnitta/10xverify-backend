@@ -13,6 +13,8 @@ import EvidenceRepository from "./components/EvidenceRepository";
 import MetricsDashboard from "./components/MetricsDashboard";
 import ActivityLogsDashboard from "./components/ActivityLogsDashboard";
 
+import { msalInstance } from "./authConfig";
+
 interface UserProfile {
   email: string;
   name: string;
@@ -39,6 +41,49 @@ export default function App() {
   });
 
   const [monitoringAlerts, setMonitoringAlerts] = useState<any[]>([]);
+
+  // Listen for Microsoft Direct Login (Redirect flow - No Popups!)
+  useEffect(() => {
+    async function processMsalRedirect() {
+      try {
+        const response = await msalInstance.handleRedirectPromise();
+        if (response && response.account) {
+          const account = response.account;
+          const userEmail = (account.username || (account.idTokenClaims as any)?.preferred_username || (account.idTokenClaims as any)?.email || "").toLowerCase();
+          const userName = account.name || userEmail.split("@")[0] || "10xDS Officer";
+
+          const res = await fetch("/api/auth/azure-sso", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              email: userEmail,
+              name: userName,
+              role: "Compliance Officer",
+              tenantId: account.tenantId,
+              homeAccountId: account.homeAccountId
+            })
+          });
+
+          const data = await res.json();
+          const loggedInUser: UserProfile = {
+            email: data.user?.email || userEmail,
+            name: data.user?.name || userName,
+            role: data.user?.role || "Compliance Officer"
+          };
+          setCurrentUser(loggedInUser);
+          localStorage.setItem("10xverify_user", JSON.stringify(loggedInUser));
+
+          // Clean URL if at callback route
+          if (window.location.pathname.includes("/api/auth/callback/azure-ad")) {
+            window.history.replaceState({}, document.title, "/");
+          }
+        }
+      } catch (err) {
+        console.error("[MSAL Redirect Handler Error]:", err);
+      }
+    }
+    processMsalRedirect();
+  }, []);
 
   const [loginEmail, setLoginEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");

@@ -7,11 +7,7 @@ import { MsalProvider } from '@azure/msal-react';
 
 async function bootstrap() {
   try {
-    const clientId = ((import.meta as any).env?.VITE_AZURE_CLIENT_ID);
-    if (clientId) {
-      await msalInstance.initialize();
-      await msalInstance.handleRedirectPromise();
-    }
+    await msalInstance.initialize();
   } catch (err) {
     console.warn("[MSAL] Note during initialization:", err);
   }

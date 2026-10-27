@@ -20,48 +20,11 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
     setError("");
     setSsoLoading(true);
     try {
-      // 1. Trigger Microsoft Entra ID popup
-      const response = await msalInstance.loginPopup(loginRequest);
-      if (!response || !response.account) {
-        throw new Error("Microsoft authentication did not return account data.");
-      }
-
-      const account = response.account;
-      const userEmail = (account.username || (account.idTokenClaims as any)?.preferred_username || (account.idTokenClaims as any)?.email || "").toLowerCase();
-      const userName = account.name || userEmail.split("@")[0] || "10xDS Officer";
-
-      // 2. Register / verify session with backend
-      const res = await fetch("/api/auth/azure-sso", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email: userEmail,
-          name: userName,
-          role: loginRole,
-          tenantId: account.tenantId,
-          homeAccountId: account.homeAccountId
-        })
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "SSO session creation failed");
-
-      // 3. Complete login
-      const loggedInUser = {
-        email: data.user.email,
-        name: data.user.name,
-        role: data.user.role || loginRole
-      };
-
-      onLogin(loggedInUser);
+      // Direct full-page redirect to Microsoft (NO POPUP!)
+      await msalInstance.loginRedirect(loginRequest);
     } catch (err: any) {
       console.error("Microsoft SSO Error:", err);
-      if (err.name === "BrowserAuthError" && err.errorCode === "user_cancelled") {
-        setError("Microsoft login was cancelled.");
-      } else {
-        setError(err.message || "Microsoft Entra ID authentication failed.");
-      }
-    } finally {
+      setError(err.message || "Failed to initiate Microsoft login.");
       setSsoLoading(false);
     }
   };
