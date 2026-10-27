@@ -52,13 +52,16 @@ export default function App() {
           const userEmail = (account.username || (account.idTokenClaims as any)?.preferred_username || (account.idTokenClaims as any)?.email || "").toLowerCase();
           const userName = account.name || userEmail.split("@")[0] || "10xDS Officer";
 
+          const chosenRole = (localStorage.getItem("10xverify_pending_role") as any) || "Compliance Officer";
+          localStorage.removeItem("10xverify_pending_role");
+
           const res = await fetch("/api/auth/azure-sso", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               email: userEmail,
               name: userName,
-              role: "Compliance Officer",
+              role: chosenRole,
               tenantId: account.tenantId,
               homeAccountId: account.homeAccountId
             })
@@ -68,7 +71,7 @@ export default function App() {
           const loggedInUser: UserProfile = {
             email: data.user?.email || userEmail,
             name: data.user?.name || userName,
-            role: data.user?.role || "Compliance Officer"
+            role: data.user?.role || chosenRole
           };
           setCurrentUser(loggedInUser);
           localStorage.setItem("10xverify_user", JSON.stringify(loggedInUser));
