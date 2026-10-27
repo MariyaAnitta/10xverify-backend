@@ -11,7 +11,7 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [role] = useState<"Vendor Node">("Vendor Node");
+  const [loginRole, setLoginRole] = useState<"Compliance Officer" | "Vetting Officer" | "Vendor">("Compliance Officer");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [ssoLoading, setSsoLoading] = useState(false);
@@ -37,7 +37,7 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
         body: JSON.stringify({
           email: userEmail,
           name: userName,
-          role: "Compliance Officer",
+          role: loginRole,
           tenantId: account.tenantId,
           homeAccountId: account.homeAccountId
         })
@@ -50,7 +50,7 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
       const loggedInUser = {
         email: data.user.email,
         name: data.user.name,
-        role: data.user.role || "Compliance Officer"
+        role: data.user.role || loginRole
       };
 
       onLogin(loggedInUser);
@@ -74,7 +74,7 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
     try {
       const endpoint = isLogin ? "/api/auth/login" : "/api/auth/register";
       const payload = isLogin 
-        ? { email, password } 
+        ? { email, password, role: loginRole } 
         : { email, password, name, role: "Vendor Node" };
 
       const res = await fetch(endpoint, {
@@ -86,13 +86,10 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Authentication failed");
 
-      // Set user structure to match App.tsx expectations
       const loggedInUser = {
         email: data.user.email,
         name: data.user.name,
-        role: data.user.role === "Admin Policy" ? "Compliance Officer" 
-            : data.user.role === "Auditor Desk" ? "Vetting Officer" 
-            : "Vendor"
+        role: data.user.role || loginRole
       };
 
       onLogin(loggedInUser);
@@ -148,7 +145,7 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
               </h2>
               <p className="text-slate-400 text-sm">
                 {isLogin 
-                  ? "Sign in with 10xDS Corporate SSO (Internal) or Vendor Credentials (External)" 
+                  ? "Sign in with corporate Microsoft SSO or enter credentials" 
                   : "Register your company to submit due diligence filings and onboarding documentation"}
               </p>
             </div>
@@ -171,27 +168,14 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
             </div>
           </div>
 
-          {/* Microsoft SSO Section for Internal Staff on Sign In Tab */}
+          {/* Microsoft SSO Section (Clean, sleek, non-intrusive) */}
           {isLogin && (
-            <div className="space-y-3 mb-6 bg-[#121927]/60 p-5 rounded-2xl border border-slate-800">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-[11px] font-bold text-slate-300 uppercase tracking-widest flex items-center gap-2">
-                  <Shield className="w-3.5 h-3.5 text-blue-400" />
-                  10xDS Internal Staff Access
-                </span>
-                <span className="text-[10px] bg-blue-500/10 text-blue-400 font-semibold px-2 py-0.5 rounded-full border border-blue-500/20">
-                  Entra ID SSO
-                </span>
-              </div>
-              <p className="text-xs text-slate-400">
-                Compliance Officers, Vetting Officers, and Platform Admins sign in directly with their corporate Microsoft account.
-              </p>
-
+            <div className="space-y-4 mb-6">
               <button
                 type="button"
                 onClick={handleMicrosoftLogin}
                 disabled={ssoLoading}
-                className="w-full bg-[#161f30] hover:bg-[#1e2a42] border border-blue-500/30 hover:border-blue-400/60 text-white font-bold py-3.5 px-4 rounded-xl transition-all text-sm flex items-center justify-center gap-3 shadow-md group cursor-pointer disabled:opacity-50 mt-2"
+                className="w-full bg-[#121927] hover:bg-[#182234] border border-slate-700/80 hover:border-slate-500 text-white font-semibold py-3.5 px-4 rounded-xl transition-all text-sm flex items-center justify-center gap-3 shadow-sm group cursor-pointer disabled:opacity-50"
               >
                 {/* Official Microsoft 4-Color Logo */}
                 <svg className="w-5 h-5 shrink-0" viewBox="0 0 21 21" fill="none">
@@ -205,23 +189,12 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
                 </span>
               </button>
 
-              <div className="relative flex py-2 items-center pt-4">
+              <div className="relative flex py-1 items-center">
                 <div className="flex-grow border-t border-slate-800"></div>
                 <span className="shrink mx-4 text-[10px] font-bold text-slate-500 uppercase tracking-widest">
-                  Or External Vendor Portal Login
+                  Or sign in with email & credentials
                 </span>
                 <div className="flex-grow border-t border-slate-800"></div>
-              </div>
-            </div>
-          )}
-
-          {/* Banner for Internal Staff on Register Tab */}
-          {!isLogin && (
-            <div className="mb-6 p-4 rounded-xl bg-blue-950/30 border border-blue-800/40 flex items-start gap-3">
-              <Shield className="w-5 h-5 text-blue-400 shrink-0 mt-0.5" />
-              <div className="text-xs leading-relaxed text-slate-300">
-                <strong className="text-blue-300 font-bold block mb-0.5">Are you a 10xDS Officer or Team Member?</strong>
-                Internal staff members do not need to register with a password. Switch to the <button type="button" onClick={() => setIsLogin(true)} className="text-blue-400 underline font-semibold hover:text-blue-300">Sign In tab</button> and click <strong>"Sign in with Microsoft (10xDS SSO)"</strong> to access with corporate credentials.
               </div>
             </div>
           )}
@@ -235,6 +208,51 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+              
+              {/* Role Selector on Sign In for seamless testing of all roles */}
+              {isLogin && (
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">
+                    Select Operating Role
+                  </label>
+                  <div className="grid grid-cols-3 gap-2 p-1.5 bg-[#121927] border border-slate-800 rounded-xl">
+                    <button
+                      type="button"
+                      onClick={() => setLoginRole("Compliance Officer")}
+                      className={`py-2.5 px-3 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                        loginRole === "Compliance Officer"
+                          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 shadow-sm"
+                          : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      Compliance Officer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLoginRole("Vetting Officer")}
+                      className={`py-2.5 px-3 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                        loginRole === "Vetting Officer"
+                          ? "bg-indigo-500/20 text-indigo-400 border border-indigo-500/40 shadow-sm"
+                          : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      Vetting Officer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLoginRole("Vendor")}
+                      className={`py-2.5 px-3 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                        loginRole === "Vendor"
+                          ? "bg-blue-500/20 text-blue-400 border border-blue-500/40 shadow-sm"
+                          : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      Vendor Portal
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {!isLogin && (
                 <div className="space-y-2 md:col-span-2">
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">
@@ -256,7 +274,7 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
 
               <div className="space-y-2 md:col-span-2">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest pl-1">
-                  {isLogin ? "Username / Vendor Email" : "Official Company Work Email"}
+                  {isLogin ? "Email Address" : "Official Company Work Email"}
                 </label>
                 <div className="relative">
                   <Mail className="absolute left-4 top-3.5 w-5 h-5 text-slate-500" />
@@ -265,7 +283,7 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder={isLogin ? "e.g. vendor_contact@supplier.com" : "e.g. compliance@yourcompany.com"}
+                    placeholder={isLogin ? "e.g. anitta.shaji@10xds.com" : "e.g. compliance@yourcompany.com"}
                     className="w-full bg-[#121927] border border-slate-700/60 rounded-xl pl-12 pr-4 py-3.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/50 transition-all"
                   />
                 </div>
@@ -281,7 +299,7 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
                     required
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter secure password"
+                    placeholder="Enter password"
                     className="w-full bg-[#121927] border border-slate-700/60 rounded-xl pl-12 pr-4 py-3.5 text-sm text-white placeholder:text-slate-600 focus:outline-none focus:border-emerald-500/50 transition-all"
                   />
                 </div>
@@ -295,7 +313,7 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
             >
               {loading 
                 ? "Processing..." 
-                : (isLogin ? "Sign In to Vendor Workspace →" : "Create Vendor Account & Continue →")}
+                : (isLogin ? "Sign In to Workspace →" : "Create Vendor Account & Continue →")}
             </button>
 
           </form>
