@@ -442,11 +442,50 @@ def login_user(req: LoginRequest, request: Request):
 
 @app.get("/api/auth/callback/azure-ad")
 def azure_ad_callback():
-    dist_dir = os.path.join(os.getcwd(), "dist")
-    index_file = os.path.join(dist_dir, "index.html")
-    if os.path.exists(index_file):
-        return FileResponse(index_file)
-    return HTMLResponse("<html><head><script>window.close();</script></head><body>Redirecting to application...</body></html>")
+    html_content = """<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>10xVerify.AI - Authenticating...</title>
+    <style>
+        body {
+            background-color: #0a0f1c;
+            color: #94a3b8;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .card { text-align: center; }
+        .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid #1e293b;
+            border-top-color: #10b981;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="spinner"></div>
+        <div style="font-size:15px; font-weight:700; color:#f8fafc; margin-bottom:6px;">Authenticating with 10xDS SSO...</div>
+        <div style="font-size:12px; color:#64748b;">Please wait, closing automatically.</div>
+    </div>
+    <script>
+        // If opened standalone in a browser tab (not in an authentication popup), redirect to main app
+        if (!window.opener) {
+            window.location.replace('/');
+        }
+    </script>
+</body>
+</html>"""
+    return HTMLResponse(content=html_content)
 
 @app.post("/api/auth/azure-sso")
 def login_azure_sso(req: AzureSSORequest, request: Request):
