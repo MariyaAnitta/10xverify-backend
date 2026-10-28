@@ -150,9 +150,6 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
                     <Shield className="w-4 h-4 text-emerald-400" />
                     10xDS Officers (Internal Access)
                   </span>
-                  <span className="text-[10px] bg-emerald-500/10 text-emerald-400 font-semibold px-2.5 py-0.5 rounded-full border border-emerald-500/20">
-                    SSO Only • No Password
-                  </span>
                 </div>
                 <p className="text-xs text-slate-400">
                   Select your active desk and sign in using your corporate Microsoft account.

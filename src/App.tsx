@@ -22,8 +22,8 @@ interface UserProfile {
 }
 
 const DEFAULT_USERS: UserProfile[] = [
-  { email: "complianceofficer@10xverify.ai", name: "M. Anitta", role: "Compliance Officer" },
-  { email: "officer@10xverify.ai", name: "V. Officer", role: "Vetting Officer" }
+  { email: "complianceofficer@10xverify.ai", name: "Lead Compliance Officer", role: "Compliance Officer" },
+  { email: "officer@10xverify.ai", name: "Senior Vetting Officer", role: "Vetting Officer" }
 ];
 
 export default function App() {
@@ -343,7 +343,14 @@ export default function App() {
             { id: "vendor-queue", label: "Vendor Portal Queue", desc: "Audit registrations", icon: ClipboardList },
             { id: "evidence", label: "Evidence Logs", desc: "Audit registry pack", icon: Database },
             { id: "activity-logs", label: "User Activity Logs", desc: "Audit trail & security", icon: ShieldCheck }
-          ].map(tab => {
+          ].filter(tab => {
+            // Enterprise role separation: Vetting Officers focus on operational due diligence & screening.
+            // Security Audit Trails and Platform Risk Metrics are reserved for Compliance Officers.
+            if (currentUser.role === "Vetting Officer") {
+              return tab.id !== "activity-logs" && tab.id !== "metrics";
+            }
+            return true;
+          }).map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id && !selectedVendorId;
 

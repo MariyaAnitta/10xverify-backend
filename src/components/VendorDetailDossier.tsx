@@ -20,7 +20,7 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
     e.preventDefault();
     if (!commentText.trim()) return;
     onAddComment({
-      author: currentUser?.name || "M. Anitta",
+      author: currentUser?.name || "Authorized Officer",
       content: commentText.trim()
     });
     setCommentText("");
@@ -228,82 +228,6 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
           </div>
         </div>
       </div>
-
-      {/* Risk Assessment Engine Details */}
-      {(() => {
-        const getRiskLevel = (score: number) => {
-          if (score >= 80) return { label: "Low", class: "bg-emerald-50 text-emerald-700 border-emerald-150" };
-          if (score >= 60) return { label: "Medium", class: "bg-amber-50 text-amber-700 border-amber-150" };
-          if (score >= 40) return { label: "High", class: "bg-red-50 text-red-700 border-red-150" };
-          return { label: "Critical", class: "bg-slate-900 text-white border-slate-950" };
-        };
-
-        const categories = [
-          { name: "Corporate Identity", agentKey: "corporate-agent", confidence: "92%" },
-          { name: "Regulatory & Sanctions", agentKey: "regulatory-agent", confidence: "88%" },
-          { name: "Financial Solvency", agentKey: "financial-agent", confidence: "84%" },
-          { name: "Cyber & Digital Trust", agentKey: "digital-agent", confidence: "79%" },
-          { name: "Geographic Office Verification", agentKey: "location-agent", confidence: "85%" },
-          { name: "Public Reputation & Litigation", agentKey: "reputation-agent", confidence: "86%" }
-        ];
-
-        return (
-          <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm space-y-4">
-            <div className="flex justify-between items-center border-b border-slate-50 pb-2">
-              <div>
-                <h3 className="text-sm font-bold text-slate-950 uppercase tracking-wider mb-1">Risk Assessment Engine</h3>
-                <p className="text-xxs text-slate-400 font-medium">Detailed audit score breakdown and intelligence index per domain</p>
-              </div>
-              <div className="text-right">
-                <span className="text-xxs font-bold text-slate-400 uppercase tracking-widest block">Average Confidence</span>
-                <span className="text-sm font-extrabold text-blue-600">85.6%</span>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xxs border-collapse">
-                <thead>
-                  <tr className="border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                    <th className="py-2.5">Category</th>
-                    <th className="py-2.5 text-center">Risk Score (0-100)</th>
-                    <th className="py-2.5 text-center">Risk Level</th>
-                    <th className="py-2.5 text-center">Confidence</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-50 font-medium text-slate-700">
-                  {categories.map(cat => {
-                    const agent = vendor.agentResults[cat.agentKey as keyof typeof vendor.agentResults];
-                    const score = agent ? agent.score : vendor.riskScore;
-                    const level = getRiskLevel(score);
-                    
-                    return (
-                      <tr key={cat.agentKey} className="hover:bg-slate-50/50 transition-colors">
-                        <td className="py-3 font-bold text-slate-800">{cat.name}</td>
-                        <td className="py-3 text-center">
-                          <div className="flex items-center justify-center gap-2">
-                            <div className="w-16 bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                              <div className={`h-full ${
-                                score >= 80 ? "bg-emerald-500" : score >= 60 ? "bg-amber-500" : score >= 40 ? "bg-red-500" : "bg-slate-950"
-                              }`} style={{ width: `${score}%` }}></div>
-                            </div>
-                            <span className="font-mono text-slate-900 w-8 text-right">{score}%</span>
-                          </div>
-                        </td>
-                        <td className="py-3 text-center">
-                          <span className={`inline-block px-2.5 py-0.5 rounded text-[10px] font-bold border ${level.class}`}>
-                            {level.label}
-                          </span>
-                        </td>
-                        <td className="py-3 text-center font-mono text-slate-500">{cat.confidence}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        );
-      })()}
 
       {/* Grid of basic metadata */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -523,7 +447,7 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
                     type="text"
                     disabled
                     className="w-full px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-slate-500 text-xxs cursor-not-allowed font-bold"
-                    value={currentUser?.name || "M. Anitta"}
+                    value={currentUser?.name || "Authorized Officer"}
                   />
                 </div>
               </div>
