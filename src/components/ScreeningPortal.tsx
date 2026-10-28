@@ -28,7 +28,6 @@ export default function ScreeningPortal({ onScreeningComplete, autoStartVendor }
   const [screenedBy, setScreenedBy] = useState("M. Anitta");
   
   const [email, setEmail] = useState("");
-  const [financials, setFinancials] = useState<any>(null);
 
   const [hasAutoStarted, setHasAutoStarted] = useState(false);
 
@@ -57,7 +56,6 @@ export default function ScreeningPortal({ onScreeningComplete, autoStartVendor }
       setCompanyName(autoStartVendor.companyName || "");
       setWebsite(autoStartVendor.website || "");
       setEmail(autoStartVendor.contactEmail || autoStartVendor.email || "");
-      setFinancials(autoStartVendor.financials || null);
       
       const c = countries.includes(autoStartVendor.country) ? autoStartVendor.country : "Other (Write-in)";
       setCountry(c);
@@ -214,8 +212,7 @@ export default function ScreeningPortal({ onScreeningComplete, autoStartVendor }
           country: finalCountry,
           industry: finalIndustry,
           screenedBy,
-          email: email || undefined,
-          financials: financials || undefined
+          email: email || undefined
         })
       });
 
@@ -234,7 +231,6 @@ export default function ScreeningPortal({ onScreeningComplete, autoStartVendor }
       setCustomCountry("");
       setCustomIndustry("");
       setEmail("");
-      setFinancials(null);
     } catch (err: any) {
       console.error(err);
       setErrorMessage(err.message || "Something went wrong during agent orchestration.");

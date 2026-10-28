@@ -12,8 +12,6 @@ from pydantic import BaseModel
 from typing import List, Optional
 from server.agents import execute_adk_verification, query_opensanctions, query_gnews, query_whoisjson
 import asyncio
-from server.email_ingestion import start_email_listener, parse_vendor_with_llm
-from server.pdf_generator import generate_dossier_html
 
 app = FastAPI(title="10xVerify.AI Portal API")
 
@@ -1316,117 +1314,6 @@ async def screen_vendor(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"ADK Agent execution failed: {e}")
-
-@app.post("/api/power-automate/screen", response_class=HTMLResponse)
-async def power_automate_webhook(request: Request):
-    try:
-        print("[Power Automate Webhook] Received webhook request. Parsing body as JSON...")
-        data = await request.json()
-        email_body = data.get("body", "")
-        print(f"[Power Automate Webhook] Extracted email body (length: {len(email_body)}). Calling parse_vendor_with_llm...")
-        
-        # Parse the email to find the vendor
-        vendor_data = await parse_vendor_with_llm(email_body, "Forwarded Email via Power Automate")
-        print(f"[Power Automate Webhook] Vendor extraction result: {vendor_data}")
-        
-        if not vendor_data or not vendor_data.get('companyName'):
-            print("[Power Automate Webhook] Error: Could not extract companyName from email.")
-            return HTMLResponse("<html><body><h1>Error</h1><p>Could not extract vendor details from the email.</p></body></html>", status_code=400)
-            
-        # Run ADK verification
-        print(f"[Power Automate Webhook] Executing ADK verification for: {vendor_data['companyName']}")
-        
-        # 1. Compute stable MD5 ID to check for recent duplicate requests (retries)
-        import hashlib
-        import re
-        from datetime import datetime, timezone
-        
-        c_name = vendor_data['companyName']
-        # Normalize company name (remove brackets, suffixes, and non-alphanumeric characters)
-        n = c_name.lower()
-        n = re.sub(r'\(.*?\)', '', n)
-        n = re.sub(r'[^a-z0-9\s]', '', n)
-        suffixes = [r'\bltd\b', r'\blimited\b', r'\bpvt\b', r'\bprivate\b', r'\bco\b', r'\bcompany\b']
-        for s in suffixes:
-            n = re.sub(s, '', n)
-        norm_name = " ".join(n.split())
-        stable_hash = int(hashlib.md5(norm_name.encode('utf-8')).hexdigest(), 16) % 10000
-        vendor_id = f"vnd-{stable_hash}"
-        
-        doc_ref = db_fs.collection("vendors").document(vendor_id)
-        doc = doc_ref.get()
-        if doc.exists:
-            existing_data = doc.to_dict()
-            status = existing_data.get("status")
-            
-            # If the record is currently in progress, wait for it instead of starting a new run!
-            if status == "In Progress":
-                print(f"[Power Automate Webhook] Vendor {vendor_id} check is already in progress. Waiting/polling...")
-                for _ in range(40): # wait up to 120 seconds
-                    await asyncio.sleep(3.0)
-                    fresh_doc = doc_ref.get()
-                    if fresh_doc.exists:
-                        fresh_data = fresh_doc.to_dict()
-                        if fresh_data.get("status") == "Completed":
-                            print(f"[Power Automate Webhook] Vendor {vendor_id} finished in background. Returning report.")
-                            html_report = generate_dossier_html(fresh_data)
-                            return html_report
-                print(f"[Power Automate Webhook] Polling timed out for {vendor_id}.")
-                return HTMLResponse("<html><body><h1>Error</h1><p>Verification is taking longer than expected. Please check the dashboard.</p></body></html>", status_code=202)
-
-            screened_at_str = existing_data.get("screenedAt")
-            if screened_at_str:
-                try:
-                    # Clean Z and parse ISO timestamp
-                    clean_date_str = screened_at_str.replace("Z", "")
-                    dt = datetime.fromisoformat(clean_date_str).replace(tzinfo=timezone.utc)
-                    age_seconds = (datetime.now(timezone.utc) - dt).total_seconds()
-                    
-                    # If verified in the last 10 minutes and completed, return cached HTML report instantly
-                    if age_seconds < 600 and status == "Completed":
-                        print(f"[Power Automate Webhook] Vendor {vendor_id} was recently verified {age_seconds:.1f} seconds ago. Returning cached report.")
-                        html_report = generate_dossier_html(existing_data)
-                        return html_report
-                except Exception as ex:
-                    print(f"[Power Automate Webhook] Failed to check cached report age: {ex}")
-        
-        # Write "In Progress" lock to Firestore to block concurrent retries
-        doc_ref.set({
-            "id": vendor_id,
-            "companyName": c_name,
-            "status": "In Progress",
-            "screenedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-            "website": vendor_data['website'],
-            "country": vendor_data.get('country', 'Unknown'),
-            "industry": vendor_data.get('industry', 'Unknown'),
-            "riskScore": 0,
-            "riskRating": "UNKNOWN",
-            "executiveSummary": "Verification scan initiated and currently in progress...",
-            "recommendation": "Pending verification completion."
-        })
-        
-        result = await execute_adk_verification(
-            company_name=vendor_data['companyName'],
-            website=vendor_data['website'],
-            country=vendor_data.get('country', 'Unknown'),
-            industry=vendor_data.get('industry', 'Unknown'),
-            screened_by="Power Automate Webhook"
-        )
-        
-        # Save to Firestore (overwrites the "In Progress" lock with completed data)
-        vendor_id = result.get("id")
-        if vendor_id:
-            db_fs.collection("vendors").document(vendor_id).set(result)
-            
-        # Generate and return HTML response for Power Automate to convert to PDF
-        html_report = generate_dossier_html(result)
-        return html_report
-        
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        print(f"[Power Automate Webhook] Error: {e}")
-        return HTMLResponse(f"<html><body><h1>Error</h1><p>Internal verification failed: {e}</p></body></html>", status_code=500)
 
 # Serve compiled static React app in production mode
 dist_dir = os.path.join(os.getcwd(), "dist")

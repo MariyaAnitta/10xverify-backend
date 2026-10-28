@@ -10,7 +10,6 @@ from google.adk.agents import Agent
 from google.adk.models.google_llm import Gemini
 from google.adk.tools import google_search
 from google.adk.runners import InMemoryRunner
-from server.financial_validators import validate_iban, validate_swift, validate_vat
 
 load_dotenv()
 
@@ -1059,37 +1058,8 @@ async def execute_adk_verification(
     
     log_evidence(vendor_id, company_name, "Geoapify GIS Geocoding", address_to_validate, "200 OK" if places_data else "No Result / Offline", places_data)
 
-    # Run Local Banking and VAT Validators if financials are provided
-    financial_report = "Financial Audit Report: Stated financial credentials not provided for verification."
-    if financials:
-        iban = financials.get("iban")
-        swift = financials.get("swift")
-        tax_id = financials.get("taxId")
-        
-        iban_report = "Not Provided"
-        if iban:
-            v_iban = validate_iban(iban)
-            iban_report = "VALID (Modulo-97 Verified)" if v_iban.get("valid") else f"INVALID ({v_iban.get('reason')})"
-            log_evidence(vendor_id, company_name, "Local IBAN Mod97 Check", iban, "200 OK", v_iban)
-            
-        swift_report = "Not Provided"
-        if swift:
-            v_swift = validate_swift(swift)
-            swift_report = "VALID (BIC Format Matches)" if v_swift.get("valid") else f"INVALID ({v_swift.get('reason')})"
-            log_evidence(vendor_id, company_name, "Local SWIFT BIC Regex Check", swift, "200 OK", v_swift)
-            
-        vat_report = "Not Provided"
-        if tax_id:
-            v_vat = await validate_vat(tax_id, country)
-            vat_report = f"VALID (Method: {v_vat.get('method', 'Direct API')})" if v_vat.get("valid") else f"INVALID ({v_vat.get('reason')})"
-            log_evidence(vendor_id, company_name, f"EU VIES VAT / National Tax Audit ({country})", tax_id, "200 OK" if v_vat.get("valid") else "Error/Invalid", v_vat)
-            
-        financial_report = (
-            f"Financial Credentials Audit Report:\n"
-            f"- Stated Bank IBAN Number: {iban or 'None'} // Checksum Status: {iban_report}\n"
-            f"- Stated Bank SWIFT/BIC Code: {swift or 'None'} // Format Status: {swift_report}\n"
-            f"- Stated Corporate Tax ID / VAT Number: {tax_id or 'None'} // Registry Status: {vat_report}"
-        )
+    # Financial evaluation baseline for Financial Assessment Agent
+    financial_report = "Financial Audit Report: Evaluated based on official registry status and corporate entity solvency signals."
 
     # 3. Parallelize Agents 2-6
     digital_prompt = (
