@@ -315,28 +315,15 @@ export default function App() {
             </div>
           </div>
 
-          {/* User profile session switcher */}
+          {/* User profile session */}
           <div className="flex items-center gap-3 bg-slate-50 border border-slate-100 p-1.5 px-3 rounded-2xl shrink-0 self-start md:self-auto">
             <div className="text-left">
               <div className="text-xs font-bold text-slate-800 leading-tight">{currentUser.name}</div>
               <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{currentUser.role}</div>
             </div>
-            {/* Quick Role Switcher for Testing */}
-            <button
-              onClick={() => {
-                const newRole = currentUser.role === "Compliance Officer" ? "Vetting Officer" : "Compliance Officer";
-                const updated = { ...currentUser, role: newRole as any };
-                setCurrentUser(updated);
-                localStorage.setItem("10xverify_user", JSON.stringify(updated));
-              }}
-              className="text-[10px] bg-white hover:bg-slate-100 text-slate-600 font-bold px-2 py-1 rounded-lg border border-slate-200 transition-colors cursor-pointer"
-              title="Toggle role for testing permissions"
-            >
-              Switch to {currentUser.role === "Compliance Officer" ? "Vetting Officer" : "Compliance Officer"}
-            </button>
             <button
               onClick={handleLogout}
-              className="text-xxs bg-slate-200 hover:bg-slate-350 text-slate-650 hover:text-slate-900 font-bold px-2 py-1 rounded-lg transition-colors cursor-pointer"
+              className="text-xxs bg-slate-200 hover:bg-slate-300 text-slate-700 hover:text-slate-900 font-bold px-2.5 py-1 rounded-lg transition-colors cursor-pointer"
             >
               Sign Out
             </button>

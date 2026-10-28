@@ -21,7 +21,7 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
   const [customIndustry, setCustomIndustry] = useState("");
 
   const [dbVendor, setDbVendor] = useState<any | null>(null);
-  const [submissionStatus, setSubmissionStatus] = useState<"Not_Found" | "Queue" | "Screened">("Not_Found");
+  const [submissionStatus, setSubmissionStatus] = useState<"New" | "Draft" | "Queue" | "Screened">("New");
 
   const countriesList = [
     "United States", "United Kingdom", "France", "Germany", 
@@ -38,56 +38,129 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
 
   // Fetch state on mount
   const checkStatusAndLoad = async () => {
-    if (!currentUser) return;
+    if (!currentUser || !currentUser.email) return false;
     try {
-      const res = await fetch(`/api/vendors/by-email/${currentUser.email}`);
+      const res = await fetch(`/api/vendors/by-email/${encodeURIComponent(currentUser.email)}`);
+      if (!res.ok) return false;
       const data = await res.json();
       
-      if (data.status === "Screened") {
+      if (data.status === "Screened" && data.vendor) {
         setSubmissionStatus("Screened");
         setDbVendor(data.vendor);
         setIsSubmitted(true);
         setActiveStep(3);
         
-        // Load vendor registration details into form state so they see what they filled out
+        // Load vendor registration details into form state
         const v = data.vendor;
         const b = v.details || {};
+        
+        let c = v.country || "";
+        if (c && !countriesList.includes(c)) {
+          setCustomCountry(c);
+          c = "Other (Write-in)";
+        }
+        
+        let ind = v.industry || "";
+        if (ind && !industriesList.includes(ind)) {
+          setCustomIndustry(ind);
+          ind = "Other (Write-in)";
+        }
+
         setBusinessInfo({
           legalName: v.companyName || "",
           website: v.website || "",
-          country: v.country || "",
-          industry: v.industry || "",
-          contactEmail: b.contactEmail || v.contactEmail || ""
+          country: c,
+          industry: ind,
+          contactEmail: v.contactEmail || b.contactEmail || currentUser.email || ""
         });
-        setSignature(v.signature || "");
+        setSignature(v.signature || v.digitalSignature || (v.details && v.details.signature) || currentUser.name || "");
         return true;
-      } else if (data.status === "Queue") {
+      } else if (data.status === "Queue" && data.vendor) {
         setSubmissionStatus("Queue");
-        setDbVendor(null);
+        setDbVendor(data.vendor);
         setIsSubmitted(true);
         setActiveStep(3);
         
         // Load details from queue
         const q = data.vendor;
+        let c = q.country || "";
+        if (c && !countriesList.includes(c)) {
+          setCustomCountry(c);
+          c = "Other (Write-in)";
+        }
+        
+        let ind = q.industry || "";
+        if (ind && !industriesList.includes(ind)) {
+          setCustomIndustry(ind);
+          ind = "Other (Write-in)";
+        }
+
         setBusinessInfo({
           legalName: q.companyName || "",
           website: q.website || "",
-          country: q.country || "",
-          industry: q.industry || "",
-          contactEmail: q.contactEmail || ""
+          country: c,
+          industry: ind,
+          contactEmail: q.contactEmail || currentUser.email || ""
         });
-        setSignature(q.signature || "");
+        setSignature(q.signature || currentUser.name || "");
         return true;
-      } else if (data.status === "Not_Found") {
-        setSubmissionStatus("Not_Found");
+      } else if (data.status === "Draft" && data.vendor) {
+        setSubmissionStatus("Draft");
         setDbVendor(null);
-        // Do NOT change activeStep so they remain on Step 3 to see the dismissal notice
+        setIsSubmitted(false);
+        const d = data.vendor || {};
+        const b = d.businessInfo || {};
+        let c = b.country || "";
+        if (c && !countriesList.includes(c)) {
+          setCustomCountry(c);
+          c = "Other (Write-in)";
+        }
+        let ind = b.industry || "";
+        if (ind && !industriesList.includes(ind)) {
+          setCustomIndustry(ind);
+          ind = "Other (Write-in)";
+        }
+        setBusinessInfo({
+          legalName: b.legalName || d.companyName || "",
+          website: b.website || d.website || "",
+          country: c,
+          industry: ind,
+          contactEmail: b.contactEmail || currentUser.email || ""
+        });
+        setSignature(d.signature || "");
+        return true;
+      } else {
+        setSubmissionStatus("New");
+        setDbVendor(null);
+        setIsSubmitted(false);
+        setBusinessInfo(prev => ({
+          ...prev,
+          contactEmail: prev.contactEmail || currentUser.email || ""
+        }));
         return false;
       }
-      return false;
     } catch (err) {
       console.error("Failed to query vendor status:", err);
       return false;
+    }
+  };
+
+  const handleUnlockApplication = async () => {
+    if (!currentUser?.email) return;
+    try {
+      setLoading(true);
+      await fetch(`/api/vendors/by-email/${encodeURIComponent(currentUser.email)}/unlock`, {
+        method: "POST"
+      });
+      setIsSubmitted(false);
+      setSubmissionStatus("New");
+      setDbVendor(null);
+      setActiveStep(1);
+    } catch (e) {
+      console.error("Failed to unlock application:", e);
+      alert("Failed to unlock profile. Please contact support.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -98,7 +171,7 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
       
       // If no active submission/screened record found, fetch draft so form is prefilled
       try {
-        const res = await fetch(`/api/vendor-portal/draft/${currentUser.email}`);
+        const res = await fetch(`/api/vendor-portal/draft/${encodeURIComponent(currentUser.email)}`);
         const data = await res.json();
         if (data.status === "success" && data.data) {
           if (data.data.businessInfo) {
@@ -129,7 +202,7 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
     
     const interval = setInterval(() => {
       checkStatusAndLoad();
-    }, 3000);
+    }, 4000);
     
     return () => clearInterval(interval);
   }, [activeStep, submissionStatus]);
@@ -258,13 +331,13 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
               let isActive = false;
 
               if (s.num === 1) {
-                isDone = activeStep > 1;
+                isDone = isSubmitted || activeStep > 1;
                 isActive = activeStep === 1;
               } else if (s.num === 2) {
                 isDone = isSubmitted || activeStep > 2;
                 isActive = activeStep === 2;
               } else if (s.num === 3) {
-                isDone = submissionStatus === "Screened";
+                isDone = submissionStatus === "Screened" && dbVendor?.status === "Approved";
                 isActive = activeStep === 3;
               }
               
@@ -442,13 +515,13 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
                       </p>
                     </div>
 
-                    {/* If Admin/Officer dismissed the application */}
-                    {submissionStatus === "Not_Found" && (
+                    {/* If Admin/Officer rejected the application */}
+                    {submissionStatus === "Screened" && dbVendor?.status === "Rejected" && (
                       <div className="bg-red-50 border border-red-200 rounded-2xl p-5 mb-6 space-y-3 animate-fade-in">
                         <div className="flex items-start gap-3">
                           <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
                           <div>
-                            <h4 className="text-sm font-bold text-red-900">Application Dismissed / Not In Queue</h4>
+                            <h4 className="text-sm font-bold text-red-900">Application Dismissed / Not Approved</h4>
                             <p className="text-xs text-red-700 mt-1 leading-relaxed">
                               Your self-onboarding submission was reviewed and rejected or removed from the active queue by the compliance officer. 
                               You can unlock and update your profile information to re-submit.
@@ -457,13 +530,79 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
                         </div>
                         <div className="pt-2">
                           <button
-                            onClick={() => {
-                              setIsSubmitted(false);
-                              setActiveStep(1);
-                            }}
-                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm"
+                            onClick={handleUnlockApplication}
+                            disabled={loading}
+                            className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer disabled:opacity-50"
                           >
-                            Edit & Re-Submit Application →
+                            {loading ? "Unlocking..." : "Edit & Re-Submit Application →"}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* If Approved */}
+                    {submissionStatus === "Screened" && dbVendor?.status === "Approved" && (
+                      <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 mb-6 space-y-2 animate-fade-in">
+                        <div className="flex items-start gap-3">
+                          <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                          <div>
+                            <h4 className="text-sm font-bold text-emerald-900">Onboarding Approved & Verified</h4>
+                            <p className="text-xs text-emerald-700 mt-1 leading-relaxed">
+                              Congratulations! Your self-onboarding verification has been approved by the Compliance Officer. Your entity has been registered and verified in the active partner directory.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* If Screened but Pending Officer Final Decision */}
+                    {submissionStatus === "Screened" && dbVendor?.status !== "Approved" && dbVendor?.status !== "Rejected" && (
+                      <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-5 mb-6 space-y-2 animate-fade-in">
+                        <div className="flex items-start gap-3">
+                          <Activity className="w-5 h-5 text-indigo-600 shrink-0 mt-0.5" />
+                          <div>
+                            <h4 className="text-sm font-bold text-indigo-900">AI Multi-Agent Diligence Complete</h4>
+                            <p className="text-xs text-indigo-700 mt-1 leading-relaxed">
+                              All 4 autonomous AI verification agents have completed exhaustive due diligence. Your application is currently undergoing final compliance officer review.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* If Queued */}
+                    {submissionStatus === "Queue" && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-6 space-y-2 animate-fade-in">
+                        <div className="flex items-start gap-3">
+                          <Clock className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                          <div>
+                            <h4 className="text-sm font-bold text-amber-900">Application Submitted • Queued for Screening</h4>
+                            <p className="text-xs text-amber-700 mt-1 leading-relaxed">
+                              Your self-onboarding submission has been registered and placed in the compliance triage queue. The AI workforce screening will begin shortly.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* If New / Not Submitted */}
+                    {(submissionStatus === "New" || submissionStatus === "Draft") && (
+                      <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 mb-6 space-y-3 animate-fade-in">
+                        <div className="flex items-start gap-3">
+                          <FileText className="w-5 h-5 text-slate-500 shrink-0 mt-0.5" />
+                          <div>
+                            <h4 className="text-sm font-bold text-slate-800">Application Not Yet Submitted</h4>
+                            <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                              Please complete your legal entity registration in Module 1 and provide a digital signature in Step 2 to submit for automated AI agent screening.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="pt-2">
+                          <button
+                            onClick={() => setActiveStep(1)}
+                            className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-all shadow-sm cursor-pointer"
+                          >
+                            Go to Module 1: Corporate Profile →
                           </button>
                         </div>
                       </div>
@@ -482,17 +621,16 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
                                 ? (dbVendor?.status === "Approved" ? "bg-emerald-100 text-emerald-800" :
                                    dbVendor?.status === "Rejected" ? "bg-red-100 text-red-800" :
                                    "bg-indigo-100 text-indigo-800")
-                                : (submissionStatus === "Queue" ? "bg-amber-100 text-amber-800" : 
-                                   submissionStatus === "Not_Found" ? "bg-red-100 text-red-800" : "bg-slate-100 text-slate-600")
+                                : (submissionStatus === "Queue" ? "bg-amber-100 text-amber-800" : "bg-slate-100 text-slate-600")
                             }`}>
                               <span className={`w-1.5 h-1.5 rounded-full ${
                                 submissionStatus === "Screened" 
                                   ? (dbVendor?.status === "Approved" ? "bg-emerald-500" : dbVendor?.status === "Rejected" ? "bg-red-500" : "bg-indigo-500")
-                                  : (submissionStatus === "Not_Found" ? "bg-red-500" : "bg-amber-500 animate-pulse")
+                                  : (submissionStatus === "Queue" ? "bg-amber-500 animate-pulse" : "bg-slate-400")
                               }`} />
-                              {submissionStatus === "Screened" ? (dbVendor?.status || "Audit Completed") : 
-                               (submissionStatus === "Queue" ? "Awaiting Vetting Review" : 
-                                submissionStatus === "Not_Found" ? "Application Dismissed" : "Submitted")}
+                              {submissionStatus === "Screened" 
+                                ? (dbVendor?.status === "Approved" ? "Approved & Verified" : dbVendor?.status === "Rejected" ? "Application Rejected" : "Audit Complete • In Review") 
+                                : (submissionStatus === "Queue" ? "Queued for Review" : "Drafting Profile")}
                             </span>
                           </div>
                           
@@ -507,20 +645,20 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
                           <div className="text-right">
                             <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">Trust & Risk Score</div>
                             <div className="text-2xl font-black text-slate-900 leading-none">
-                              {submissionStatus === "Screened" ? `${dbVendor?.riskScore}%` : "--"}
+                              {submissionStatus === "Screened" ? `${dbVendor?.riskScore || 85}%` : "--"}
                             </div>
                             <div className="text-[9px] text-slate-400 mt-0.5">
-                              {submissionStatus === "Screened" ? "Verified" : "Pending Vetting"}
+                              {submissionStatus === "Screened" ? (dbVendor?.status === "Approved" ? "Approved" : "Verified") : (submissionStatus === "Queue" ? "Pending Vetting" : "Not Submitted")}
                             </div>
                           </div>
                           {submissionStatus === "Screened" && (
                             <div className={`px-3 py-2 text-xs font-black rounded-lg uppercase tracking-wider ${
-                              dbVendor?.riskRating === "GREEN" ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/20" :
+                              dbVendor?.riskRating === "GREEN" || dbVendor?.status === "Approved" ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/20" :
                               dbVendor?.riskRating === "AMBER" ? "bg-amber-500 text-white shadow-sm shadow-amber-500/20" :
-                              dbVendor?.riskRating === "RED" ? "bg-red-500 text-white shadow-sm shadow-red-500/20 animate-pulse" :
+                              dbVendor?.riskRating === "RED" || dbVendor?.status === "Rejected" ? "bg-red-500 text-white shadow-sm shadow-red-500/20" :
                               "bg-slate-700 text-white"
                             }`}>
-                              {dbVendor?.riskRating || "REVIEW"}
+                              {dbVendor?.status === "Approved" ? "APPROVED" : (dbVendor?.riskRating || "REVIEW")}
                             </div>
                           )}
                         </div>
@@ -535,18 +673,22 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
                           </span>
                           <span className="text-[11px] text-slate-500">
                             {submissionStatus === "Screened" 
-                              ? "Completed (100%)" 
-                              : (submissionStatus === "Queue" ? "Assigned to Vetting Officer Queue" : "Submitted, queued for screening")}
+                              ? (dbVendor?.status === "Approved" ? "Onboarding Approved & Verified (100%)" : dbVendor?.status === "Rejected" ? "Application Dismissed" : "Workforce Audit Complete (85%) • In Compliance Review") 
+                              : (submissionStatus === "Queue" ? "Submitted to Compliance Review Queue (40%)" : "Drafting Profile (10%)")}
                           </span>
                         </div>
                         <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
                           <div 
                             className={`h-full rounded-full transition-all duration-700 ${
                               submissionStatus === "Screened" 
-                                ? (dbVendor?.riskRating === "RED" ? "bg-red-500" : "bg-emerald-500") 
-                                : "bg-indigo-500 animate-pulse"
+                                ? (dbVendor?.status === "Approved" || dbVendor?.riskRating === "GREEN" ? "bg-emerald-500" : dbVendor?.status === "Rejected" || dbVendor?.riskRating === "RED" ? "bg-red-500" : "bg-indigo-600") 
+                                : (submissionStatus === "Queue" ? "bg-amber-500 animate-pulse" : "bg-slate-300")
                             }`} 
-                            style={{ width: submissionStatus === "Screened" ? "100%" : (submissionStatus === "Queue" ? "40%" : "20%") }}
+                            style={{ 
+                              width: submissionStatus === "Screened" 
+                                ? (dbVendor?.status === "Approved" || dbVendor?.status === "Rejected" ? "100%" : "85%") 
+                                : (submissionStatus === "Queue" ? "40%" : "10%") 
+                            }}
                           />
                         </div>
                       </div>
@@ -630,10 +772,18 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
 
               {/* Bottom Action Bar */}
               <div className="mt-8 pt-4 border-t border-slate-100 flex justify-between items-center">
-                {activeStep === 3 && submissionStatus === "Screened" && (dbVendor?.status === "Approved" || dbVendor?.status === "Rejected") ? (
-                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-[10px] font-bold text-slate-500 flex items-center gap-1.5">
-                    🔒 Registration Dossier Locked. Status is finalized as {dbVendor.status}. Contact your Compliance Officer to unlock.
+                {activeStep === 3 && submissionStatus === "Screened" && dbVendor?.status === "Approved" ? (
+                  <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 text-[10px] font-bold text-emerald-800 flex items-center gap-1.5">
+                    🔒 Registration Dossier Locked & Approved. Contact your Compliance Officer to update official records.
                   </div>
+                ) : activeStep === 3 && submissionStatus === "Screened" && dbVendor?.status === "Rejected" ? (
+                  <button
+                    onClick={handleUnlockApplication}
+                    disabled={loading}
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {loading ? "Unlocking..." : "Unlock & Re-Submit Application →"}
+                  </button>
                 ) : (
                   <button 
                     onClick={handleSaveProgress}

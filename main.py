@@ -713,11 +713,23 @@ def submit_vendor_profile(req: VendorDraftRequest, request: Request):
         req.data["status"] = "Submitted"
         req.data["submittedAt"] = datetime.datetime.utcnow().isoformat() + "Z"
         req.data["id"] = f"vend-req-{int(datetime.datetime.utcnow().timestamp())}"
+        req.data["contactEmail"] = req.email.lower()
+        req.data["email"] = req.email.lower()
         
         db_fs.collection("vendor_queue").document(req.email.lower()).set(req.data)
         
-        # Optionally, remove draft
-        db_fs.collection("onboarding_drafts").document(req.email.lower()).delete()
+        # Save a copy in onboarding_drafts so if vendor views form, their data is prefilled
+        db_fs.collection("onboarding_drafts").document(req.email.lower()).set({
+            "businessInfo": {
+                "legalName": req.data.get("companyName", ""),
+                "website": req.data.get("website", ""),
+                "country": req.data.get("country", ""),
+                "industry": req.data.get("industry", ""),
+                "contactEmail": req.email.lower()
+            },
+            "signature": req.data.get("signature", ""),
+            "submitted": True
+        })
 
         client_ip = get_client_ip(request)
         cname = req.data.get("companyName") or req.data.get("businessInfo", {}).get("legalName") or req.email
@@ -739,19 +751,104 @@ def submit_vendor_profile(req: VendorDraftRequest, request: Request):
 @app.get("/api/vendors/by-email/{email}")
 def get_vendor_by_email(email: str):
     try:
-        # First, search in "vendors" collection
+        clean_email = email.strip().lower()
+        
+        # 1. Look up user profile to find their registered company name or contact person
+        user_name = ""
+        try:
+            user_doc = db_fs.collection("users").document(clean_email).get()
+            if user_doc.exists:
+                user_name = user_doc.to_dict().get("name", "").strip().lower()
+        except Exception:
+            pass
+            
+        # 2. Check draft and queue documents to extract any submitted company name
+        draft_cname = ""
+        doc_draft = db_fs.collection("onboarding_drafts").document(clean_email).get()
+        if doc_draft.exists:
+            d_dict = doc_draft.to_dict() or {}
+            draft_cname = (
+                d_dict.get("businessInfo", {}).get("legalName", "") or 
+                d_dict.get("companyName", "") or 
+                ""
+            ).strip().lower()
+
+        queue_cname = ""
+        doc_q = db_fs.collection("vendor_queue").document(clean_email).get()
+        if doc_q.exists:
+            q_dict = doc_q.to_dict() or {}
+            queue_cname = (q_dict.get("companyName", "") or "").strip().lower()
+
+        email_prefix = clean_email.split("@")[0].strip() if "@" in clean_email else clean_email
+        email_domain = clean_email.split("@")[1].split(".")[0].strip() if "@" in clean_email else ""
+        
+        # 3. Search in "vendors" collection (verified/screened vendors)
         docs = db_fs.collection("vendors").stream()
         for doc in docs:
             data = doc.to_dict()
-            if data.get("contactEmail", "").lower() == email.lower() or data.get("details", {}).get("contactEmail", "").lower() == email.lower() or doc.id.lower() == email.lower():
-                return {"status": "Screened", "vendor": data}
+            doc_id = doc.id.lower()
+            v_email = data.get("contactEmail", "").strip().lower()
+            v_details_email = data.get("details", {}).get("contactEmail", "").strip().lower()
+            v_name = data.get("companyName", "").strip().lower()
+            v_website = data.get("website", "").strip().lower()
+            
+            # Match conditions:
+            matches_email = (v_email == clean_email or v_details_email == clean_email or doc_id == clean_email)
+            matches_company = False
+            
+            # Match by submitted draft company name
+            if not matches_company and draft_cname and len(draft_cname) > 2:
+                matches_company = (v_name == draft_cname or draft_cname in v_name or v_name in draft_cname)
                 
-        # Second, search in "vendor_queue"
-        doc_q = db_fs.collection("vendor_queue").document(email.lower()).get()
+            # Match by queue company name
+            if not matches_company and queue_cname and len(queue_cname) > 2:
+                matches_company = (v_name == queue_cname or queue_cname in v_name or v_name in queue_cname)
+
+            # Match by registered user name
+            if not matches_company and user_name and len(user_name) > 2:
+                matches_company = (v_name == user_name or user_name in v_name or v_name in user_name)
+
+            # Match by company domain in email (excluding generic consumer webmail)
+            if not matches_company and email_domain and len(email_domain) > 2 and email_domain not in ["gmail", "yahoo", "hotmail", "outlook", "mail", "live", "icloud"]:
+                matches_company = (v_name == email_domain or email_domain in v_name or email_domain in v_website)
+
+            # Match by email prefix
+            if not matches_company and email_prefix and len(email_prefix) > 2:
+                matches_company = (v_name == email_prefix or email_prefix in v_name or v_name in email_prefix)
+
+            if matches_email or matches_company:
+                # Ensure contactEmail is linked for future lookups
+                if not v_email or v_email != clean_email:
+                    try:
+                        db_fs.collection("vendors").document(doc.id).update({"contactEmail": clean_email})
+                    except Exception:
+                        pass
+                return {"status": "Screened", "vendor": data}
+
+        # 4. Search in "vendor_queue" (submitted, awaiting review)
         if doc_q.exists:
             return {"status": "Queue", "vendor": doc_q.to_dict()}
             
-        return {"status": "Not_Found"}
+        # Also check all docs in vendor_queue for matching company name
+        queue_docs = db_fs.collection("vendor_queue").stream()
+        for qdoc in queue_docs:
+            qdata = qdoc.to_dict()
+            q_name = qdata.get("companyName", "").strip().lower()
+            q_email = qdata.get("contactEmail", "").strip().lower()
+            if (
+                q_email == clean_email or 
+                (draft_cname and (q_name == draft_cname or draft_cname in q_name)) or
+                (user_name and (q_name == user_name or user_name in q_name)) or 
+                (email_domain and email_domain in q_name and email_domain not in ["gmail", "yahoo", "hotmail", "outlook", "mail"]) or
+                (email_prefix and len(email_prefix) > 2 and (email_prefix in q_name or q_name in email_prefix))
+            ):
+                return {"status": "Queue", "vendor": qdata}
+
+        # 5. Search in "onboarding_drafts"
+        if doc_draft.exists:
+            return {"status": "Draft", "vendor": doc_draft.to_dict()}
+
+        return {"status": "New"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
