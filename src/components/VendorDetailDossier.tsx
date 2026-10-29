@@ -15,6 +15,7 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
   const [expandedAgent, setExpandedAgent] = useState<string | null>("risk-intelligence-agent");
   const [commentText, setCommentText] = useState("");
   const [pdfMode, setPdfMode] = useState(false);
+  const [dismissedAlerts, setDismissedAlerts] = useState<string[]>([]);
 
   const handlePostComment = (e: React.FormEvent) => {
     e.preventDefault();
@@ -159,29 +160,51 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
       )}
 
       {/* Active Monitoring Alerts Banner */}
-      {(() => {
-        const vendorAlerts = monitoringAlerts.filter(a => a.vendorId === vendor.id || (a.companyName && a.companyName.toLowerCase() === vendor.companyName.toLowerCase()));
-        if (vendorAlerts.length === 0) return null;
-        return (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3 print:hidden">
-            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-            <div className="space-y-1">
-              <h4 className="text-xs font-bold text-amber-900">
-                Active Monitoring Alerts Detected: Our continuous monitoring agents have flagged {vendorAlerts.length} change(s) or threat indicator(s) for this entity.
-              </h4>
-              <div className="space-y-1 mt-2">
-                {vendorAlerts.map((alert, idx) => (
-                  <div key={idx} className="text-xxs text-amber-800 flex items-center gap-2">
-                    <span className="font-semibold uppercase tracking-wider text-amber-900">[{alert.alertType || "THREAT"}]:</span>
-                    <span>{alert.description}</span>
-                    <span className="text-amber-600 font-mono">({new Date(alert.date).toLocaleDateString()})</span>
-                  </div>
-                ))}
-              </div>
-            </div>
+  {(() => {
+    const vendorAlerts = monitoringAlerts.filter(a => 
+      !dismissedAlerts.includes(a.id) &&
+      (a.vendorId === vendor.id || (a.companyName && a.companyName.toLowerCase() === vendor.companyName.toLowerCase()))
+    );
+    if (vendorAlerts.length === 0) return null;
+    return (
+      <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3 print:hidden">
+        <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+        <div className="space-y-1 w-full">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold text-amber-900">
+              Active Monitoring Alerts Detected: Our continuous monitoring agents have flagged {vendorAlerts.length} change(s) or threat indicator(s) for this entity.
+            </h4>
           </div>
-        );
-      })()}
+          <div className="space-y-2 mt-2">
+            {vendorAlerts.map((alert, idx) => (
+              <div key={idx} className="text-xxs text-amber-800 flex items-center justify-between gap-3 bg-amber-100/60 p-2 rounded-lg">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold uppercase tracking-wider text-amber-900">[{alert.alertType || "THREAT"}]:</span>
+                  <span>{alert.description}</span>
+                  <span className="text-amber-600 font-mono">({new Date(alert.date).toLocaleDateString()})</span>
+                </div>
+                <button
+                  onClick={async () => {
+                    if (alert.id) {
+                      try {
+                        await fetch(`/api/monitoring-alerts/${alert.id}`, { method: "DELETE" });
+                      } catch {}
+                      setDismissedAlerts(prev => [...prev, alert.id]);
+                    }
+                  }}
+                  className="px-2.5 py-1 bg-amber-200 hover:bg-amber-300 text-amber-900 rounded-md font-semibold text-[10px] shrink-0 cursor-pointer transition-colors flex items-center gap-1"
+                  title="Acknowledge and clear this alert"
+                >
+                  <CheckCircle className="w-3 h-3 text-amber-800" />
+                  <span>Acknowledge & Dismiss</span>
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  })()}
 
       {/* Main header block */}
       <div className={`p-6 md:p-8 border border-slate-100 rounded-2xl ${getRiskBorder(vendor.riskRating)} space-y-6`}>

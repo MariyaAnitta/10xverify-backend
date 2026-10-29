@@ -132,23 +132,23 @@ export default function MetricsDashboard({ vendors }: MetricsDashboardProps) {
             <line x1="10" y1="90" x2="290" y2="90" stroke="#f1f5f9" strokeWidth="1" />
 
             {/* Bezier Path Area Fill */}
-            <path d="M 10 90 Q 60 70, 110 75 T 210 50 T 290 35 L 290 90 Z" fill="url(#chartGradient)" />
+            <path d="M 10 90 Q 60 75, 110 70 T 210 50 T 290 35 L 290 90 Z" fill="url(#chartGradient)" />
 
             {/* Bezier Path Line */}
-            <path d="M 10 90 Q 60 70, 110 75 T 210 50 T 290 35" fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" />
+            <path d="M 10 90 Q 60 75, 110 70 T 210 50 T 290 35" fill="none" stroke="#3b82f6" strokeWidth="2.5" strokeLinecap="round" />
 
             {/* Node Dots */}
             <circle cx="10" cy="90" r="3.5" fill="#ffffff" stroke="#3b82f6" strokeWidth="2" />
-            <circle cx="66" cy="71" r="3.5" fill="#ffffff" stroke="#3b82f6" strokeWidth="2" />
-            <circle cx="122" cy="74" r="3.5" fill="#ffffff" stroke="#3b82f6" strokeWidth="2" />
-            <circle cx="178" cy="62" r="3.5" fill="#ffffff" stroke="#3b82f6" strokeWidth="2" />
-            <circle cx="234" cy="46" r="3.5" fill="#ffffff" stroke="#3b82f6" strokeWidth="2" />
+            <circle cx="66" cy="78" r="3.5" fill="#ffffff" stroke="#3b82f6" strokeWidth="2" />
+            <circle cx="122" cy="70" r="3.5" fill="#ffffff" stroke="#3b82f6" strokeWidth="2" />
+            <circle cx="178" cy="55" r="3.5" fill="#ffffff" stroke="#3b82f6" strokeWidth="2" />
+            <circle cx="234" cy="45" r="3.5" fill="#ffffff" stroke="#3b82f6" strokeWidth="2" />
             <circle cx="290" cy="35" r="3.5" fill="#ffffff" stroke="#3b82f6" strokeWidth="2" />
 
-            {/* Hover tooltip values */}
-            <text x="66" y="60" textAnchor="middle" className="text-[8px] font-bold text-blue-600 bg-white">70%</text>
-            <text x="178" y="52" textAnchor="middle" className="text-[8px] font-bold text-blue-600 bg-white">76%</text>
-            <text x="290" y="25" textAnchor="middle" className="text-[8px] font-bold text-blue-600 bg-white">{avgConfidence}%</text>
+            {/* Dynamic average confidence label */}
+            <text x="290" y="24" textAnchor="middle" className="text-[9px] font-bold text-blue-600 bg-white">
+              {avgConfidence}% Active
+            </text>
           </svg>
         </div>
 
@@ -161,7 +161,11 @@ export default function MetricsDashboard({ vendors }: MetricsDashboardProps) {
               const mIndex = (currentMonthIndex - i + 12) % 12;
               last6.push(monthNames[mIndex]);
             }
-            return last6.map((m, idx) => <span key={idx}>{m}</span>);
+            return last6.map((m, idx) => (
+              <span key={idx} className={idx === 5 ? "text-blue-600 font-extrabold" : ""}>
+                {m} {idx === 5 ? "(Now)" : ""}
+              </span>
+            ));
           })()}
         </div>
       </div>

@@ -577,18 +577,25 @@ async def run_continuous_monitoring_audit():
                 
             print(f"[Monitoring Agent] Auditing vendor: {company_name} ({website})...")
             
-            # 1. Check GNews for new adverse press
+            # 1. Check GNews only for genuine adverse media
             news = await query_gnews(company_name)
             if news and isinstance(news, list) and len(news) > 0:
-                alert_id = f"alert-{vendor_id}-media"
-                db_fs.collection("monitoring_alerts").document(alert_id).set({
-                    "id": alert_id,
-                    "companyName": company_name,
-                    "alertType": "adverse_media",
-                    "severity": "high",
-                    "description": f"Continuous Audit: 1 new news mention resolved on GNews matching '{company_name}'.",
-                    "date": datetime.datetime.utcnow().isoformat() + "Z"
-                })
+                adverse_keywords = ["fraud", "lawsuit", "scam", "penalty", "investigation", "breach", "bankrupt", "sanction", "guilty", "fine", "indict"]
+                adverse_hits = [
+                    a for a in news 
+                    if any(kw in str(a).lower() for kw in adverse_keywords)
+                ]
+                if adverse_hits:
+                    alert_id = f"alert-{vendor_id}-media"
+                    db_fs.collection("monitoring_alerts").document(alert_id).set({
+                        "id": alert_id,
+                        "vendorId": vendor_id,
+                        "companyName": company_name,
+                        "alertType": "adverse_media",
+                        "severity": "high",
+                        "description": f"Continuous Audit: Adverse press detected for '{company_name}': {adverse_hits[0].get('title', 'Legal/regulatory investigation')}",
+                        "date": datetime.datetime.utcnow().isoformat() + "Z"
+                    })
                 
             # 2. Check OpenSanctions for listing updates
             sanctions = await query_opensanctions(company_name)
@@ -596,6 +603,7 @@ async def run_continuous_monitoring_audit():
                 alert_id = f"alert-{vendor_id}-sanction"
                 db_fs.collection("monitoring_alerts").document(alert_id).set({
                     "id": alert_id,
+                    "vendorId": vendor_id,
                     "companyName": company_name,
                     "alertType": "sanction_link",
                     "severity": "critical",
@@ -603,16 +611,17 @@ async def run_continuous_monitoring_audit():
                     "date": datetime.datetime.utcnow().isoformat() + "Z"
                 })
                 
-            # 3. WHOIS status updates
+            # 3. WHOIS status updates: only flag genuine risk (disposable domains < 14 days)
             whois = await query_whoisjson(website)
-            if whois and whois.get("domainAgeDays") and whois.get("domainAgeDays") > 0:
+            if whois and whois.get("domainAgeDays") and 0 < whois.get("domainAgeDays") < 14:
                 alert_id = f"alert-{vendor_id}-domain"
                 db_fs.collection("monitoring_alerts").document(alert_id).set({
                     "id": alert_id,
+                    "vendorId": vendor_id,
                     "companyName": company_name,
                     "alertType": "domain_change",
                     "severity": "warning",
-                    "description": f"Continuous Audit: Verified active SSL/TLS registration mapping for {website} is current.",
+                    "description": f"Continuous Audit: Domain {website} registration is extremely young (<14 days). Risk of disposable domain.",
                     "date": datetime.datetime.utcnow().isoformat() + "Z"
                 })
                 
@@ -624,18 +633,17 @@ async def check_and_trigger_monitoring():
     try:
         doc = db_fs.collection("system_config").document("monitoring_status").get()
         last_run_iso = doc.to_dict().get("lastRunAt") if doc.exists else None
-        should_run = False
         now = datetime.datetime.utcnow()
         if not last_run_iso:
-            should_run = True
-        else:
-            try:
-                last_dt = datetime.datetime.fromisoformat(last_run_iso.replace("Z", "+00:00")).replace(tzinfo=None)
-                if (now - last_dt).total_seconds() > 7 * 86400:
-                    should_run = True
-            except Exception:
-                should_run = True
-        if should_run:
+            # Baseline initialization: sets timestamp so next automatic check runs in 7 days
+            print("[Monitoring Agent] Initializing continuous audit baseline. Next scheduled check in 7 days.")
+            db_fs.collection("system_config").document("monitoring_status").set({
+                "lastRunAt": now.isoformat() + "Z"
+            })
+            return
+
+        last_dt = datetime.datetime.fromisoformat(last_run_iso.replace("Z", "+00:00")).replace(tzinfo=None)
+        if (now - last_dt).total_seconds() >= 7 * 86400:
             print("[Monitoring Agent] 7-day monitoring interval elapsed. Triggering weekly continuous audit...")
             db_fs.collection("system_config").document("monitoring_status").set({
                 "lastRunAt": now.isoformat() + "Z"
@@ -646,12 +654,20 @@ async def check_and_trigger_monitoring():
 
 @app.on_event("startup")
 async def startup_event():
+    # Purge old false-positive SSL verification alerts from database
+    try:
+        alerts = db_fs.collection("monitoring_alerts").stream()
+        for a in alerts:
+            data = a.to_dict()
+            if "Verified active SSL/TLS registration mapping" in data.get("description", ""):
+                a.reference.delete()
+    except Exception:
+        pass
     asyncio.create_task(check_and_trigger_monitoring())
 
 # API Endpoints
 @app.get("/api/health")
 async def health():
-    asyncio.create_task(check_and_trigger_monitoring())
     mode = "AI_ACTIVE" if os.getenv("GEMINI_API_KEY") else "SIMULATED"
     return {"status": "ok", "mode": mode}
 
@@ -662,6 +678,14 @@ def get_monitoring_alerts():
         alerts = [doc.to_dict() for doc in docs]
         alerts.sort(key=lambda x: x.get("date", ""), reverse=True)
         return alerts
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/api/monitoring-alerts/{alert_id}")
+def delete_monitoring_alert(alert_id: str):
+    try:
+        db_fs.collection("monitoring_alerts").document(alert_id).delete()
+        return {"status": "success", "message": f"Alert {alert_id} dismissed."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
