@@ -513,45 +513,56 @@ async def query_linkfinder(website: str):
         print("[GetProspect API] Skipping: No valid API key found.")
         return None
     try:
-        # GetProspect Company Search API (Search companies)
-        url = "https://api.getprospect.com/public/v1/insights/companies"
+        clean_web = website.replace("https://", "").replace("http://", "").replace("www.", "").strip().rstrip("/")
+        
+        # GetProspect API v2 uses 'x-api-key' header
         headers = {
+            "x-api-key": api_key,
             "apiKey": api_key,
             "Content-Type": "application/json",
             "Accept": "application/json"
         }
         
-        # Searching by company domain
-        payload = {
-            "domain": {
-                "included": [website]
-            }
-        }
+        # 1. Try primary v2 company enrich endpoint
+        url_v2 = "https://api.getprospect.com/v2/companies/enrich"
+        payload_v2 = {"domain": clean_web}
         
-        print(f"[GetProspect API] Requesting data for {website} via POST...")
+        print(f"[GetProspect API] Requesting data for {clean_web} via POST /v2/companies/enrich...")
         async with httpx.AsyncClient() as client:
-            res = await client.post(url, json=payload, headers=headers, timeout=8.0)
+            res = await client.post(url_v2, json=payload_v2, headers=headers, timeout=10.0)
             print(f"[GetProspect API] Response Status: {res.status_code}")
             
+            company = None
             if res.status_code == 200:
                 data = res.json()
-                company = None
-                
-                # Extract first hit from the results array
-                if data.get("data") and len(data["data"]) > 0:
-                    company = data["data"][0]
-                elif isinstance(data, list) and len(data) > 0:
-                    company = data[0]
+                company = data.get("data") or data.get("company") or data
+                if isinstance(company, list) and len(company) > 0:
+                    company = company[0]
+            elif res.status_code != 404:
+                # 2. Fallback to v1 insights search if v2 returns non-200
+                url_v1 = "https://api.getprospect.com/public/v1/insights/companies"
+                payload_v1 = {"domain": {"included": [clean_web]}}
+                res_v1 = await client.post(url_v1, json=payload_v1, headers=headers, timeout=8.0)
+                if res_v1.status_code == 200:
+                    data_v1 = res_v1.json()
+                    if data_v1.get("data") and len(data_v1["data"]) > 0:
+                        company = data_v1["data"][0]
+                    elif isinstance(data_v1, list) and len(data_v1) > 0:
+                        company = data_v1[0]
 
-                if company:
-                    return {
-                        "employeeCountRange": company.get("size") or company.get("employees") or "Unknown",
-                        "linkedInUrl": company.get("linkedinUrl") or company.get("linkedin") or "",
-                        "industry": company.get("industry") or "",
-                        "foundedYear": company.get("founded") or company.get("yearFounded")
-                    }
+            if company and isinstance(company, dict):
+                size = company.get("size") or company.get("employees") or company.get("headcount") or company.get("employeeCountRange") or "Unknown"
+                linkedin = company.get("linkedin_url") or company.get("linkedinUrl") or company.get("linkedin") or ""
+                industry = company.get("industry") or ""
+                founded = company.get("founded") or company.get("year_founded") or company.get("yearFounded")
+                return {
+                    "employeeCountRange": size,
+                    "linkedInUrl": linkedin,
+                    "industry": industry,
+                    "foundedYear": founded
+                }
             else:
-                print(f"[GetProspect API] Error Body: {res.text}")
+                print(f"[GetProspect API] No company profile resolved for {clean_web}.")
     except Exception as e:
         print(f"[GetProspect API] Exception: {e}")
     return None
