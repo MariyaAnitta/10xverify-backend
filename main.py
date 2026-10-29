@@ -224,9 +224,9 @@ def migrate_seed_data():
     except Exception as e:
         print(f"[Firebase] Migration seeding failed: {e}")
 
-# Migrate database.json contents to Firestore at startup if empty
-migrate_seed_data()
-seed_activity_logs_if_empty()
+# Migrate database.json contents to Firestore at startup if empty (Disabled to keep database clean)
+# migrate_seed_data()
+# seed_activity_logs_if_empty()
 
 def calculate_metrics(vendors):
     # Standard metrics generator
