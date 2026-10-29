@@ -24,6 +24,7 @@ export default function ScreeningPortal({ onScreeningComplete, autoStartVendor }
   const [country, setCountry] = useState("United States");
   const [customCountry, setCustomCountry] = useState("");
   const [industry, setIndustry] = useState("Healthcare");
+  const [customIndustry, setCustomIndustry] = useState("");
   const [screenedBy, setScreenedBy] = useState(() => {
     try {
       const u = JSON.parse(localStorage.getItem("10xverify_user") || "{}");

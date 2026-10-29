@@ -1,5 +1,7 @@
 import os
+import re
 import json
+import hashlib
 import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore
@@ -10,7 +12,9 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi import Request
 from pydantic import BaseModel
 from typing import List, Optional
+import base64
 from server.agents import execute_adk_verification, query_opensanctions, query_gnews, query_whoisjson
+from server.pdf_generator import generate_vendor_pdf_dossier
 import asyncio
 
 app = FastAPI(title="10xVerify.AI Portal API")
@@ -1272,6 +1276,231 @@ async def screen_vendor(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"ADK Agent execution failed: {e}")
+
+class PowerAutomateEmailRequest(BaseModel):
+    subject: Optional[str] = ""
+    body: str
+    senderEmail: Optional[str] = ""
+    forwarderEmail: Optional[str] = ""
+    fromHeader: Optional[str] = ""
+
+@app.post("/api/power-automate/screen")
+async def power_automate_screen_endpoint(req: PowerAutomateEmailRequest, request: Request):
+    client_ip = get_client_ip(request)
+    raw_text = f"Subject: {req.subject}\nFrom Header: {req.fromHeader}\nSender: {req.senderEmail}\nBody:\n{req.body}"
+    
+    # 1. Filter out automated non-vendor system messages (Microsoft, alerts, newsletters) to save credits
+    ignored_keywords = [
+        "microsoftonline", "password reset", "undeliverable", "mailer-daemon", 
+        "security code", "verify your account", "noreply@microsoft.com", 
+        "calendar invite", "accepted your invitation", "tentative:"
+    ]
+    raw_lower = raw_text.lower()
+    if any(k in raw_lower for k in ignored_keywords):
+        return {
+            "status": "skipped",
+            "isVendor": False,
+            "shouldReply": False,
+            "message": "Filtered out automated non-vendor system message."
+        }
+        
+    # 2. Extract vendor info from forwarded email
+    sender_domain = ""
+    company_name = ""
+    contact_name = ""
+    designation = ""
+    recipient_email = req.forwarderEmail or req.senderEmail or ""
+    
+    # Check for forwarded headers: "From: Name <email@domain.com>"
+    from_match = re.search(r'From:\s*([^<\n\r]+)?\s*<([^>@]+@([^>]+))>', req.body, re.IGNORECASE)
+    if not from_match:
+        from_match = re.search(r'From:\s*([^\s<]+@[^\s>]+)', req.body, re.IGNORECASE)
+        
+    if from_match:
+        if len(from_match.groups()) >= 3 and from_match.group(3):
+            contact_name = (from_match.group(1) or "").strip()
+            sender_email_ext = from_match.group(2).strip()
+            sender_domain = from_match.group(3).strip()
+        elif len(from_match.groups()) >= 1:
+            sender_email_ext = from_match.group(1).strip()
+            if "@" in sender_email_ext:
+                sender_domain = sender_email_ext.split("@")[1].strip()
+
+    # Extract recipient (e.g. "To: Binu Koshy <Binu.Koshy@10xds.com>")
+    if not recipient_email:
+        to_match = re.search(r'To:\s*([^<\n\r]+)?\s*<([^>@]+@[^>]+)>', req.body, re.IGNORECASE)
+        if to_match and to_match.group(2):
+            recipient_email = to_match.group(2).strip()
+
+    # Extract human name and designation from introductory sentences:
+    # e.g., "my name is Tyler Olson, and I serve as President of SiteGen Solar"
+    intro_match = re.search(r'(?:my name is|I am)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)', req.body, re.IGNORECASE)
+    if intro_match:
+        contact_name = intro_match.group(1).strip()
+
+    serve_match = re.search(r'(?:serve as|am the|work as)\s+([A-Za-z\s]+?)\s+(?:of|at)\s+([A-Za-z0-9\s]+?)(?:,|\.|\n)', req.body, re.IGNORECASE)
+    if serve_match:
+        designation = serve_match.group(1).strip().title()
+        if not company_name:
+            company_name = serve_match.group(2).strip()
+
+    # Check email sign-off signature for name and designation
+    # e.g.:
+    # Best regards,
+    # Tyler Olson
+    # President
+    # SiteGen Solar
+    sig_match = re.search(r'(?:Best regards|Regards|Sincerely|Warm regards|Thanks)[,\s]*\n+\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+)+)\s*\n+\s*([A-Za-z\s]{3,40})\s*\n+\s*([A-Za-z0-9\s]{3,50})?', req.body, re.IGNORECASE)
+    if sig_match:
+        if not contact_name or "@" in contact_name:
+            contact_name = sig_match.group(1).strip()
+        if not designation:
+            designation = sig_match.group(2).strip().title()
+        if not company_name and sig_match.group(3):
+            company_name = sig_match.group(3).strip()
+
+    # Fallback designation scan for common executive roles
+    if not designation:
+        desig_patterns = [
+            r'\b(President|CEO|Chief Executive Officer|Founder|Co-Founder|Managing Director|Executive Director|Vice President|VP|Director|General Manager|Principal|Partner|Consultant|Owner)\b'
+        ]
+        for dp in desig_patterns:
+            m = re.search(dp, req.body, re.IGNORECASE)
+            if m:
+                designation = m.group(1).title()
+                break
+
+    # If contact_name is still an email string or empty, parse username
+    if not contact_name or "@" in contact_name:
+        raw_user = (from_match.group(1) if from_match and from_match.groups() else "") or ""
+        if "@" in raw_user:
+            raw_user = raw_user.split("@")[0]
+        elif sender_domain and "@" in req.body:
+            email_part = re.search(r'([a-zA-Z0-9._%+-]+)@' + re.escape(sender_domain), req.body)
+            if email_part:
+                raw_user = email_part.group(1)
+        if raw_user:
+            contact_name = " ".join([p.capitalize() for p in re.split(r'[._-]', raw_user) if p])
+
+    # Derive company name from domain or subject if not found yet
+    if req.subject and not company_name:
+        # e.g. "SiteGen Solar [Short Hello Note: 3807431232]" -> "SiteGen Solar"
+        clean_subj = re.split(r'\[|-|:|\|', req.subject)[0].strip()
+        clean_subj = re.sub(r'^(FW|FWD|RE):\s*', '', clean_subj, flags=re.IGNORECASE).strip()
+        if len(clean_subj) > 2 and not clean_subj.lower().startswith("hello"):
+            company_name = clean_subj
+
+    if not company_name and sender_domain:
+        # e.g. sitegensolarassociates.com -> Sitegen Solar Associates
+        dom_name = sender_domain.split(".")[0]
+        company_name = re.sub(r'([a-z])([A-Z])', r'\1 \2', dom_name).title()
+        
+    website = sender_domain or "sitegensolarassociates.com"
+    country = "United States"
+    industry = "Commercial & Industrial"
+    if "solar" in (company_name + req.body).lower():
+        industry = "Renewable Energy & Solar"
+        
+    if not company_name:
+        return {
+            "status": "skipped",
+            "isVendor": False,
+            "shouldReply": False,
+            "message": "Could not identify a clear vendor entity in the forwarded text."
+        }
+
+    # 3. Run multi-agent screening
+    print(f"[Power Automate] Screening forwarded vendor: {company_name} ({website}) for recipient: {recipient_email}...")
+    result = await execute_adk_verification(company_name, website, country, industry)
+    
+    # 4. Save into Firestore vendors collection
+    norm_name = re.sub(r'[^a-z0-9\s]', '', company_name.lower())
+    stable_hash = int(hashlib.md5(norm_name.encode('utf-8')).hexdigest(), 16) % 10000
+    vendor_id = f"vnd-{stable_hash}"
+    result["id"] = vendor_id
+    result["contactEmail"] = sender_domain or recipient_email
+    db_fs.collection("vendors").document(vendor_id).set(result)
+    
+    # 5. Generate PDF Dossier
+    contact_name_clean = contact_name or "Tyler Olson"
+    designation_clean = designation or "President"
+    pdf_bytes = generate_vendor_pdf_dossier(
+        vendor_data=result,
+        contact_name=contact_name_clean,
+        designation=designation_clean
+    )
+    pdf_b64 = base64.b64encode(pdf_bytes).decode("utf-8")
+    
+    # 6. Formulate clean reply message
+    rating_label = "LOW RISK" if result.get("riskRating") == "GREEN" else "MEDIUM RISK" if result.get("riskRating") == "AMBER" else "HIGH RISK"
+    badge_bg = "#dcfce7" if result.get("riskRating") == "GREEN" else "#fef3c7" if result.get("riskRating") == "AMBER" else "#fee2e2"
+    badge_color = "#166534" if result.get("riskRating") == "GREEN" else "#92400e" if result.get("riskRating") == "AMBER" else "#991b1b"
+
+    email_body_html = f"""<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #1e293b; max-width: 600px; line-height: 1.5;">
+  <p>Hello,</p>
+  <p>10xVerify.AI has completed an autonomous multi-agent due diligence screening for <b>{company_name}</b>.</p>
+  
+  <div style="border: 1px solid #e2e8f0; border-radius: 8px; overflow: hidden; margin: 16px 0; background-color: #ffffff;">
+    <div style="background-color: #0f172a; color: #ffffff; padding: 12px 16px; font-weight: 600; font-size: 14px;">
+      10xVerify Due Diligence Summary
+    </div>
+    <table style="width: 100%; border-collapse: collapse; font-size: 13px;">
+      <tr style="border-bottom: 1px solid #f1f5f9;">
+        <td style="padding: 10px 16px; color: #64748b; width: 140px;"><b>Vendor Entity:</b></td>
+        <td style="padding: 10px 16px; font-weight: 600;">{company_name} ({website})</td>
+      </tr>
+      <tr style="border-bottom: 1px solid #f1f5f9;">
+        <td style="padding: 10px 16px; color: #64748b;"><b>Primary Contact:</b></td>
+        <td style="padding: 10px 16px;"><b>{contact_name_clean}</b> &nbsp;|&nbsp; <span style="background-color: #eff6ff; color: #1d4ed8; padding: 2px 8px; border-radius: 4px; font-weight: 600; font-size: 12px;">{designation_clean}</span></td>
+      </tr>
+      <tr style="border-bottom: 1px solid #f1f5f9;">
+        <td style="padding: 10px 16px; color: #64748b;"><b>Integrity Score:</b></td>
+        <td style="padding: 10px 16px; font-weight: 700; font-size: 15px;">{result.get('riskScore', 0)} / 100</td>
+      </tr>
+      <tr style="border-bottom: 1px solid #f1f5f9;">
+        <td style="padding: 10px 16px; color: #64748b;"><b>Risk Evaluation:</b></td>
+        <td style="padding: 10px 16px;">
+          <span style="background-color: {badge_bg}; color: {badge_color}; padding: 3px 10px; border-radius: 12px; font-weight: 700; font-size: 12px;">{rating_label}</span>
+        </td>
+      </tr>
+      <tr>
+        <td style="padding: 10px 16px; color: #64748b;"><b>Directive:</b></td>
+        <td style="padding: 10px 16px; color: #334155;"><i>{result.get('recommendation', 'Proceed with standard procurement onboarding.')}</i></td>
+      </tr>
+    </table>
+  </div>
+
+  <p>The comprehensive multi-agent PDF audit dossier is attached: <b>10xVerify_Risk_Dossier_{company_name.replace(' ', '_')}.pdf</b>.</p>
+  <p style="color: #94a3b8; font-size: 11px; margin-top: 24px;">Sent automatically by 10xVerify.AI Intelligent Workforce Integration Node • 10xDS</p>
+</div>"""
+
+    log_user_activity(
+        user_email=recipient_email or "outlook-forward@10xds.com",
+        user_name=recipient_email.split('@')[0] if recipient_email else "Outlook Agent",
+        user_role="System Integration",
+        action="VENDOR_SCREENED_POWER_AUTOMATE",
+        target=company_name,
+        details=f"Email forward from '{recipient_email}' processed. {company_name} ({designation_clean}: {contact_name_clean}) screened with score {result.get('riskScore')}% ({rating_label}). PDF dossier generated.",
+        ip_address=client_ip,
+        status="SUCCESS"
+    )
+
+    return {
+        "status": "success",
+        "isVendor": True,
+        "shouldReply": True,
+        "recipientEmail": recipient_email,
+        "companyName": company_name,
+        "contactName": contact_name_clean,
+        "designation": designation_clean,
+        "riskScore": result.get("riskScore", 0),
+        "riskRating": rating_label,
+        "recommendation": result.get("recommendation", ""),
+        "pdfFileName": f"10xVerify_Risk_Dossier_{company_name.replace(' ', '_')}.pdf",
+        "pdfBase64": pdf_b64,
+        "emailSubject": f"10xVerify Risk Dossier: {company_name} ({designation_clean}: {contact_name_clean})",
+        "emailBody": email_body_html
+    }
 
 # Serve compiled static React app in production mode
 dist_dir = os.path.join(os.getcwd(), "dist")

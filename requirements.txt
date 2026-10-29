@@ -4,3 +4,4 @@ google-adk>=2.2.0
 httpx
 python-dotenv
 firebase-admin
+reportlab
