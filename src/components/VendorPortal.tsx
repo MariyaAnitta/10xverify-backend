@@ -481,7 +481,7 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
                           value={signature}
                           onChange={e => setSignature(e.target.value)}
                           className="w-full bg-slate-50 border border-slate-200 rounded-xl pl-12 pr-4 py-2.5 text-sm font-medium focus:outline-none focus:border-indigo-500" 
-                          placeholder="e.g. Marie Anitta" 
+                          placeholder="e.g. John Doe" 
                           disabled={isSubmitted}
                         />
                       </div>
