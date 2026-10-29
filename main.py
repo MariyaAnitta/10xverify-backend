@@ -1430,16 +1430,23 @@ async def power_automate_screen_endpoint(req: PowerAutomateEmailRequest, request
         if len(clean_subj) > 2 and not clean_subj.lower().startswith("hello"):
             company_name = clean_subj
 
+    # Filter out internal company and freemail domains from vendor domain
+    internal_freemail = ["10xds.com", "tenxds.in", "gmail.com", "outlook.com", "hotmail.com", "yahoo.com"]
+    if sender_domain.lower() in internal_freemail:
+        sender_domain = ""
+        
+    # Search for external email domain mentioned in the body (e.g. tyler.olson@sitegensolarassociates.com)
+    if not sender_domain:
+        all_domains = re.findall(r'[\w.-]+@([\w.-]+\.[a-zA-Z]{2,})', plain_body)
+        for dom in all_domains:
+            if dom.lower() not in internal_freemail:
+                sender_domain = dom.lower()
+                break
+
     if not company_name and sender_domain:
         # e.g. sitegensolarassociates.com -> Sitegen Solar Associates
         dom_name = sender_domain.split(".")[0]
         company_name = re.sub(r'([a-z])([A-Z])', r'\1 \2', dom_name).title()
-        
-    website = sender_domain or "sitegensolarassociates.com"
-    country = "United States"
-    industry = "Commercial & Industrial"
-    if "solar" in (company_name + req.body).lower():
-        industry = "Renewable Energy & Solar"
         
     if not company_name:
         return {
@@ -1449,10 +1456,28 @@ async def power_automate_screen_endpoint(req: PowerAutomateEmailRequest, request
             "message": "Could not identify a clear vendor entity in the forwarded text."
         }
 
+    # Clean vendor website address
+    if sender_domain:
+        website = sender_domain
+    else:
+        clean_slug = re.sub(r'[^a-z0-9]', '', company_name.lower())
+        website = f"{clean_slug}.com" if clean_slug else "sitegensolar.com"
+
+    country = "United States"
+    industry = "Commercial & Industrial"
+    if "solar" in (company_name + req.body).lower():
+        industry = "Renewable Energy & Solar"
+
     # 3. Run multi-agent screening
     print(f"[Power Automate] Screening forwarded vendor: {company_name} ({website}) for recipient: {recipient_email}...")
     try:
-        result = await execute_adk_verification(company_name, website, country, industry)
+        result = await execute_adk_verification(
+            company_name=company_name,
+            website=website,
+            country=country,
+            industry=industry,
+            screened_by=recipient_email or "Outlook Forwarding Agent"
+        )
         
         # 4. Save into Firestore vendors collection
         norm_name = re.sub(r'[^a-z0-9\s]', '', company_name.lower())

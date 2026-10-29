@@ -983,7 +983,7 @@ async def execute_adk_verification(
     website: str,
     country: str,
     industry: str,
-    screened_by: str,
+    screened_by: str = "Outlook Forwarding Agent",
     financials: dict = None
 ):
     input_message = f'Verify company "{company_name}" with website "{website}" in country "{country}" under industry "{industry}".'
