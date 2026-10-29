@@ -87,15 +87,19 @@ def generate_vendor_pdf_dossier(vendor_data: dict, contact_name: str = None, des
     # Determine rating color
     if risk_rating == "GREEN":
         rating_color = colors.HexColor("#059669")
+        rating_hex = "#059669"
         rating_label = "LOW RISK"
     elif risk_rating == "AMBER":
         rating_color = colors.HexColor("#d97706")
+        rating_hex = "#d97706"
         rating_label = "MEDIUM RISK"
     elif risk_rating == "RED":
         rating_color = colors.HexColor("#dc2626")
+        rating_hex = "#dc2626"
         rating_label = "HIGH RISK"
     else:
         rating_color = colors.HexColor("#0f172a")
+        rating_hex = "#0f172a"
         rating_label = "SANCTIONS BLOCK"
 
     header_table_data = [
@@ -105,7 +109,7 @@ def generate_vendor_pdf_dossier(vendor_data: dict, contact_name: str = None, des
         ],
         [
             Paragraph(f"Executive Risk Dossier: <b>{company_name}</b>", title_style),
-            Paragraph(f"<font color='{rating_color.hexval()}'><b>{rating_label} ({risk_score}% INTEGRITY)</b></font>", ParagraphStyle("Score", parent=title_style, alignment=TA_RIGHT, fontSize=14))
+            Paragraph(f"<font color='{rating_hex}'><b>{rating_label} ({risk_score}% INTEGRITY)</b></font>", ParagraphStyle("Score", parent=title_style, alignment=TA_RIGHT, fontSize=14))
         ]
     ]
 
