@@ -101,13 +101,13 @@ export default function ExecutiveDashboard({ vendors, metrics, onVendorSelect, o
   const getRiskBadge = (rating: RiskRating) => {
     switch (rating) {
       case RiskRating.GREEN:
-        return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-full"><span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>Low Risk (Green)</span>;
+        return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-full"><span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>Low Risk</span>;
       case RiskRating.AMBER:
-        return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-semibold rounded-full"><span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>Med Risk (Amber)</span>;
+        return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-semibold rounded-full"><span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>Medium Risk</span>;
       case RiskRating.RED:
-        return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-50 text-red-700 text-xs font-semibold rounded-full animate-pulse"><span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping"></span>High Risk (Red)</span>;
+        return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-50 text-red-700 text-xs font-semibold rounded-full animate-pulse"><span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping"></span>High Risk</span>;
       case RiskRating.BLACK:
-        return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-800 text-xs font-semibold rounded-full"><span className="w-1.5 h-1.5 bg-slate-900 rounded-full"></span>Critical Block (Black)</span>;
+        return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-800 text-xs font-semibold rounded-full"><span className="w-1.5 h-1.5 bg-slate-900 rounded-full"></span>Sanctions Block</span>;
     }
   };
 
@@ -119,7 +119,7 @@ export default function ExecutiveDashboard({ vendors, metrics, onVendorSelect, o
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-400 uppercase tracking-widest">Total Screened</span>
-            <span className="p-1 px-1.5 bg-slate-50 text-slate-600 rounded-md text-xxs font-bold">ALL</span>
+            <span className="w-2 h-2 rounded-full bg-slate-300"></span>
           </div>
           <div className="mt-4">
             <h3 className="text-3xl font-bold text-slate-900 tracking-tight">{metrics.totalScreened}</h3>
@@ -133,7 +133,7 @@ export default function ExecutiveDashboard({ vendors, metrics, onVendorSelect, o
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-emerald-600 uppercase tracking-widest">Active Low Risk</span>
-            <span className="p-1 px-1.5 bg-emerald-50 text-emerald-600 rounded-md text-xxs font-bold">GREEN</span>
+            <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
           </div>
           <div className="mt-4">
             <h3 className="text-3xl font-bold text-emerald-600 tracking-tight">{metrics.riskDistribution.green}</h3>
@@ -145,7 +145,7 @@ export default function ExecutiveDashboard({ vendors, metrics, onVendorSelect, o
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-amber-600 uppercase tracking-widest">Additional Review</span>
-            <span className="p-1 px-1.5 bg-amber-50 text-amber-600 rounded-md text-xxs font-bold">AMBER</span>
+            <span className="w-2 h-2 rounded-full bg-amber-500"></span>
           </div>
           <div className="mt-4">
             <h3 className="text-3xl font-bold text-amber-500 tracking-tight">{metrics.riskDistribution.amber}</h3>
@@ -157,7 +157,7 @@ export default function ExecutiveDashboard({ vendors, metrics, onVendorSelect, o
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-red-600 uppercase tracking-widest">High Risk Warnings</span>
-            <span className="p-1 px-1.5 bg-red-50 text-red-600 rounded-md text-xxs font-bold">RED</span>
+            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
           </div>
           <div className="mt-4">
             <h3 className="text-3xl font-bold text-red-500 tracking-tight font-sans">{metrics.riskDistribution.red}</h3>
@@ -169,7 +169,7 @@ export default function ExecutiveDashboard({ vendors, metrics, onVendorSelect, o
         <div className="bg-white p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-slate-900 uppercase tracking-widest">Sanctions Blocks</span>
-            <span className="p-1 px-1.5 bg-slate-900 text-white rounded-md text-xxs font-bold">BLACK</span>
+            <span className="w-2 h-2 rounded-full bg-slate-900"></span>
           </div>
           <div className="mt-4">
             <h3 className="text-3xl font-bold text-slate-950 tracking-tight">{metrics.riskDistribution.black}</h3>
@@ -228,10 +228,10 @@ export default function ExecutiveDashboard({ vendors, metrics, onVendorSelect, o
             <span className="text-xxs font-bold text-slate-400 uppercase tracking-wider mr-2">Filter Risk:</span>
             {[
               { id: "ALL", label: "All Categories" },
-              { id: "GREEN", label: "Green (Low)" },
-              { id: "AMBER", label: "Amber (Med)" },
-              { id: "RED", label: "Red (High)" },
-              { id: "BLACK", label: "Black (Block)" }
+              { id: "GREEN", label: "Low Risk" },
+              { id: "AMBER", label: "Medium Risk" },
+              { id: "RED", label: "High Risk" },
+              { id: "BLACK", label: "Sanctions Block" }
             ].map(pill => (
               <button
                 key={pill.id}
