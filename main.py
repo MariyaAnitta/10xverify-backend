@@ -620,9 +620,38 @@ async def run_continuous_monitoring_audit():
     except Exception as e:
         print(f"[Monitoring Agent] Error running audit: {e}")
 
+async def check_and_trigger_monitoring():
+    try:
+        doc = db_fs.collection("system_config").document("monitoring_status").get()
+        last_run_iso = doc.to_dict().get("lastRunAt") if doc.exists else None
+        should_run = False
+        now = datetime.datetime.utcnow()
+        if not last_run_iso:
+            should_run = True
+        else:
+            try:
+                last_dt = datetime.datetime.fromisoformat(last_run_iso.replace("Z", "+00:00")).replace(tzinfo=None)
+                if (now - last_dt).total_seconds() > 7 * 86400:
+                    should_run = True
+            except Exception:
+                should_run = True
+        if should_run:
+            print("[Monitoring Agent] 7-day monitoring interval elapsed. Triggering weekly continuous audit...")
+            db_fs.collection("system_config").document("monitoring_status").set({
+                "lastRunAt": now.isoformat() + "Z"
+            })
+            asyncio.create_task(run_continuous_monitoring_audit())
+    except Exception as e:
+        print(f"[Monitoring Agent] Check failed: {e}")
+
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(check_and_trigger_monitoring())
+
 # API Endpoints
 @app.get("/api/health")
 async def health():
+    asyncio.create_task(check_and_trigger_monitoring())
     mode = "AI_ACTIVE" if os.getenv("GEMINI_API_KEY") else "SIMULATED"
     return {"status": "ok", "mode": mode}
 

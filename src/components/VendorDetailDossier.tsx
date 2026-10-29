@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ArrowLeft, MapPin, Globe, Shield, Calendar, CreditCard, ChevronDown, ChevronUp, Printer, MessageSquare, Send, CheckCircle, HelpCircle, Trash2 } from "lucide-react";
+import { ArrowLeft, MapPin, Globe, Shield, Calendar, CreditCard, ChevronDown, ChevronUp, Printer, MessageSquare, Send, CheckCircle, HelpCircle, Trash2, AlertTriangle } from "lucide-react";
 import { VendorScreening, RiskRating } from "../types";
 
 interface VendorDetailDossierProps {
@@ -157,6 +157,31 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
           </button>
         </div>
       )}
+
+      {/* Active Monitoring Alerts Banner */}
+      {(() => {
+        const vendorAlerts = monitoringAlerts.filter(a => a.vendorId === vendor.id || (a.companyName && a.companyName.toLowerCase() === vendor.companyName.toLowerCase()));
+        if (vendorAlerts.length === 0) return null;
+        return (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3 print:hidden">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <h4 className="text-xs font-bold text-amber-900">
+                Active Monitoring Alerts Detected: Our continuous monitoring agents have flagged {vendorAlerts.length} change(s) or threat indicator(s) for this entity.
+              </h4>
+              <div className="space-y-1 mt-2">
+                {vendorAlerts.map((alert, idx) => (
+                  <div key={idx} className="text-xxs text-amber-800 flex items-center gap-2">
+                    <span className="font-semibold uppercase tracking-wider text-amber-900">[{alert.alertType || "THREAT"}]:</span>
+                    <span>{alert.description}</span>
+                    <span className="text-amber-600 font-mono">({new Date(alert.date).toLocaleDateString()})</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Main header block */}
       <div className={`p-6 md:p-8 border border-slate-100 rounded-2xl ${getRiskBorder(vendor.riskRating)} space-y-6`}>
