@@ -147,49 +147,6 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
         </div>
       )}
 
-      {/* Continuous Monitoring Alert Banner */}
-      {(() => {
-        const screenedDate = vendor.screenedAt ? new Date(vendor.screenedAt).getTime() : 0;
-        const companyAlerts = monitoringAlerts.filter(alert => {
-          const isMatchingCompany = alert.vendorId === vendor.id || 
-            alert.companyName?.toLowerCase().trim() === vendor.companyName?.toLowerCase().trim();
-          if (!isMatchingCompany) return false;
-          // Only show alerts that actually occurred AFTER the vendor was screened
-          const alertDate = alert.date ? new Date(alert.date).getTime() : 0;
-          return alertDate > screenedDate;
-        });
-        if (companyAlerts.length === 0) return null;
-        return (
-          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 mb-6 space-y-3 animate-fade-in print:hidden">
-            <div className="flex items-start gap-3">
-              <Shield className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-              <div>
-                <h3 className="text-sm font-bold text-amber-900">Active Monitoring Alerts Detected</h3>
-                <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
-                  Our continuous monitoring agents have flagged {companyAlerts.length} change(s) or threat indicator(s) since this vendor was vetted. The original audit is preserved below.
-                </p>
-              </div>
-            </div>
-            
-            <div className="divide-y divide-amber-100 bg-white border border-amber-200 rounded-xl overflow-hidden">
-              {companyAlerts.map(alert => (
-                <div key={alert.id} className="p-3 text-xxs flex items-start gap-2.5">
-                  <span className={`inline-block px-1.5 py-0.5 text-[8px] font-bold uppercase rounded shrink-0 ${
-                    alert.severity === "critical" ? "bg-slate-900 text-white" : "bg-red-150 text-red-700"
-                  }`}>
-                    {alert.alertType.replace("_", " ")}
-                  </span>
-                  <div className="space-y-0.5">
-                    <p className="text-slate-700 font-semibold leading-relaxed">{alert.description}</p>
-                    <span className="text-[9px] text-slate-400 font-normal block">{new Date(alert.date).toLocaleString()}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        );
-      })()}
-
       {/* Main header block */}
       <div className={`p-6 md:p-8 border border-slate-100 rounded-2xl ${getRiskBorder(vendor.riskRating)} space-y-6`}>
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">

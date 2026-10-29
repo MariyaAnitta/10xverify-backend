@@ -622,45 +622,9 @@ async def run_continuous_monitoring_audit():
     except Exception as e:
         print(f"[Monitoring Agent] Error running audit: {e}")
 
-async def check_and_trigger_monitoring():
-    try:
-        config_ref = db_fs.collection("system_config").document("monitoring_status")
-        config = config_ref.get()
-        
-        now = datetime.datetime.utcnow()
-        run_audit = False
-        
-        if not config.exists:
-            run_audit = True
-        else:
-            data = config.to_dict()
-            last_run_str = data.get("lastRunAt")
-            if last_run_str:
-                last_run = datetime.datetime.fromisoformat(last_run_str.replace("Z", "+00:00")).replace(tzinfo=None)
-                if (now - last_run).days >= 7:
-                    run_audit = True
-            else:
-                run_audit = True
-                
-        if run_audit:
-            print("[Monitoring Agent] Triggering weekly passive audit check...")
-            config_ref.set({"lastRunAt": now.isoformat() + "Z"})
-            asyncio.create_task(run_continuous_monitoring_audit())
-    except Exception as e:
-        print(f"[Monitoring Agent] Error checking schedule: {e}")
-
-@app.on_event("startup")
-async def startup_event():
-    # Run the passive audit check 5 seconds after startup for testing
-    async def delayed_trigger():
-        await asyncio.sleep(5)
-        await check_and_trigger_monitoring()
-    asyncio.create_task(delayed_trigger())
-
 # API Endpoints
 @app.get("/api/health")
 async def health():
-    asyncio.create_task(check_and_trigger_monitoring())
     mode = "AI_ACTIVE" if os.getenv("GEMINI_API_KEY") else "SIMULATED"
     return {"status": "ok", "mode": mode}
 
