@@ -54,6 +54,17 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
     }
   };
 
+  if (!vendor) {
+    return (
+      <div className="bg-white rounded-2xl p-12 text-center border border-slate-100">
+        <p className="text-slate-500 text-sm">Vendor dossier could not be loaded.</p>
+        <button onClick={onBack} className="mt-4 px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold cursor-pointer">
+          Return to Dashboard
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className={`space-y-6 ${pdfMode ? "max-w-4xl mx-auto bg-white p-10 border shadow-md font-sans" : ""}`} id="vendor-dossier">
       {/* Navigation and PDF trigger */}

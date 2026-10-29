@@ -508,9 +508,8 @@ async def query_sec_edgar(company_name: str):
     return None
 
 async def query_linkfinder(website: str):
-    # Updated to use GetProspect API
-    api_key = os.getenv("GETPROSPECT_API_KEY") or os.getenv("LINKFINDER_API_KEY")
-    if not api_key or "MY_" in api_key or "3aZ" in api_key:
+    api_key = (os.getenv("GETPROSPECT_API_KEY") or os.getenv("LINKFINDER_API_KEY") or "").strip()
+    if not api_key or "MY_" in api_key or api_key == "your_key_here":
         print("[GetProspect API] Skipping: No valid API key found.")
         return None
     try:

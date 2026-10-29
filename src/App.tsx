@@ -26,6 +26,46 @@ const DEFAULT_USERS: UserProfile[] = [
   { email: "officer@10xverify.ai", name: "Senior Vetting Officer", role: "Vetting Officer" }
 ];
 
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean; error: any }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
+  }
+  componentDidCatch(error: any, info: any) {
+    console.error("ErrorBoundary caught an error:", error, info);
+  }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
+          <div className="bg-white p-8 rounded-2xl border border-slate-200 shadow-sm max-w-md space-y-4">
+            <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-xl flex items-center justify-center mx-auto">
+              <Shield className="w-6 h-6" />
+            </div>
+            <h2 className="text-lg font-bold text-slate-900">Workspace View Refreshed</h2>
+            <p className="text-xs text-slate-500 leading-relaxed">
+              A temporary render interruption occurred. Click below to return to your platform workspace.
+            </p>
+            <button
+              onClick={() => {
+                this.setState({ hasError: false, error: null });
+                window.location.href = "/";
+              }}
+              className="px-5 py-2.5 bg-slate-900 text-white font-bold text-xs rounded-xl hover:bg-slate-800 transition-colors cursor-pointer"
+            >
+              Return to Platform Workspace
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   const [vendors, setVendors] = useState<VendorScreening[]>([]);
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
@@ -296,7 +336,8 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans" id="applet-root">
+    <ErrorBoundary>
+      <div className="min-h-screen bg-slate-50 text-slate-800 flex flex-col font-sans" id="applet-root">
       
       {/* Top Header Bar */}
       <header className="bg-white border-b border-slate-100 sticky top-0 z-50 px-6 py-4 shadow-xxs">
@@ -482,6 +523,7 @@ export default function App() {
         </div>
       </footer>
 
-    </div>
+      </div>
+    </ErrorBoundary>
   );
 }

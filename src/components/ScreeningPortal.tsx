@@ -78,14 +78,15 @@ export default function ScreeningPortal({ onScreeningComplete, autoStartVendor }
       setCurrentStageIndex(0);
       setTickerLogs([`[SYSTEM] Digital workforce auto-initiated from Admin Queue for ${autoStartVendor.companyName}.`]);
     }
-  }, [autoStartVendor, hasAutoStarted, countries, industries]);
+  }, [autoStartVendor, hasAutoStarted]);
 
   // Simulates ticker logs running in the background for active agent
   useEffect(() => {
     if (!isRunning) return;
 
     let logCounter = 0;
-    const stage = STAGES[currentStageIndex];
+    const stage = STAGES[Math.min(currentStageIndex, STAGES.length - 1)];
+    if (!stage) return;
     
     // Add initial log
     setTickerLogs(prev => [
@@ -390,7 +391,7 @@ export default function ScreeningPortal({ onScreeningComplete, autoStartVendor }
             <div className="flex justify-between text-xs font-semibold text-slate-600">
               <span className="text-blue-600 animate-pulse flex items-center gap-1">
                 <Cpu className="w-4 h-4 animate-spin text-blue-500" />
-                {isFinalizing ? "Synthesizing Agent Consensus..." : `Active Agent: ${STAGES[currentStageIndex].name}`}
+                {isFinalizing ? "Synthesizing Agent Consensus..." : `Active Agent: ${STAGES[Math.min(currentStageIndex, STAGES.length - 1)]?.name || "Agent"}`}
               </span>
               <span>{isFinalizing ? "Consolidating Findings..." : `${Math.round(((currentStageIndex + 1) / STAGES.length) * 100)}% Complete`}</span>
             </div>
