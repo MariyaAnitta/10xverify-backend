@@ -451,23 +451,17 @@ def login_azure_sso(req: AzureSSORequest, request: Request):
     client_ip = get_client_ip(request)
     try:
         user_ref = db_fs.collection("users").document(req.email.lower())
-        user_doc = user_ref.get()
-        
         user_role = req.role or "Compliance Officer"
-        if user_doc.exists:
-            existing = user_doc.to_dict()
-            if existing.get("role"):
-                user_role = existing.get("role")
-        else:
-            # First time logging in with Azure SSO, persist in users collection
-            user_data = {
-                "email": req.email.lower(),
-                "name": req.name,
-                "role": user_role,
-                "authProvider": "microsoft_entra_id",
-                "createdAt": firestore.SERVER_TIMESTAMP
-            }
-            user_ref.set(user_data)
+        
+        # Always persist and honor the user's chosen operating role for this session
+        user_data = {
+            "email": req.email.lower(),
+            "name": req.name,
+            "role": user_role,
+            "authProvider": "microsoft_entra_id",
+            "lastLoginAt": firestore.SERVER_TIMESTAMP
+        }
+        user_ref.set(user_data, merge=True)
             
         log_user_activity(
             user_email=req.email.lower(),

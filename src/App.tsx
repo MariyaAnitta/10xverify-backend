@@ -71,7 +71,7 @@ export default function App() {
           const loggedInUser: UserProfile = {
             email: data.user?.email || userEmail,
             name: data.user?.name || userName,
-            role: data.user?.role || chosenRole
+            role: chosenRole || data.user?.role || "Compliance Officer"
           };
           setCurrentUser(loggedInUser);
           localStorage.setItem("10xverify_user", JSON.stringify(loggedInUser));
