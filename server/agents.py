@@ -523,10 +523,15 @@ async def query_linkfinder(website: str):
             "Accept": "application/json"
         }
         
-        # 1. Try primary v2 company enrich endpoint
-        # GetProspect API v2 /v2/companies/enrich expects a flat JSON object: {"domain": clean_web}
+        # 1. Primary v2 company enrich endpoint
+        # Per official docs (https://getprospect.com/api-docs/company-enrich.md):
+        # Body schema requires: {"data": {"domain": clean_web}}
         url_v2 = "https://api.getprospect.com/v2/companies/enrich"
-        payload_v2 = {"domain": clean_web}
+        payload_v2 = {
+            "data": {
+                "domain": clean_web
+            }
+        }
         
         print(f"[GetProspect API] Requesting data for {clean_web} via POST /v2/companies/enrich...")
         async with httpx.AsyncClient() as client:
@@ -535,34 +540,49 @@ async def query_linkfinder(website: str):
             
             company = None
             if res.status_code == 200:
-                data = res.json()
-                if isinstance(data, dict):
-                    company = data.get("company") or data.get("data") or data
-                elif isinstance(data, list) and len(data) > 0:
-                    company = data[0]
+                body = res.json()
+                if body.get("success") and body.get("data"):
+                    company = body["data"]
             elif res.status_code != 404:
-                # 2. Fallback to v1 insights search if v2 returns non-200
-                url_v1 = "https://api.getprospect.com/public/v1/insights/companies"
-                payload_v1 = {"domain": {"included": [clean_web]}}
-                res_v1 = await client.post(url_v1, json=payload_v1, headers=headers, timeout=8.0)
-                if res_v1.status_code == 200:
-                    data_v1 = res_v1.json()
-                    if data_v1.get("data") and len(data_v1["data"]) > 0:
-                        company = data_v1["data"][0]
-                    elif isinstance(data_v1, list) and len(data_v1) > 0:
-                        company = data_v1[0]
+                # 2. Fallback to v2 Company Search endpoint (free & filter by domain)
+                # Per docs: {"filters": {"company": {"domain": {"include": [clean_web]}}}}
+                url_search = "https://api.getprospect.com/v2/companies/search"
+                payload_search = {
+                    "filters": {
+                        "company": {
+                            "domain": {
+                                "include": [clean_web]
+                            }
+                        }
+                    }
+                }
+                res_search = await client.post(url_search, json=payload_search, headers=headers, timeout=8.0)
+                if res_search.status_code == 200:
+                    search_data = res_search.json()
+                    results = search_data.get("data", [])
+                    if results and len(results) > 0:
+                        company = results[0]
 
             if company and isinstance(company, dict):
-                size = company.get("size") or company.get("employees") or company.get("headcount") or company.get("employeeCountRange") or "Unknown"
+                size = (
+                    company.get("employee_count") or 
+                    company.get("headcount") or 
+                    company.get("size") or 
+                    company.get("employees") or 
+                    company.get("employee_range") or 
+                    "Unknown"
+                )
                 linkedin = company.get("linkedin_url") or company.get("linkedinUrl") or company.get("linkedin") or ""
                 industry = company.get("industry") or ""
                 founded = company.get("founded") or company.get("year_founded") or company.get("yearFounded")
-                return {
-                    "employeeCountRange": size,
+                result_obj = {
+                    "employeeCountRange": str(size),
                     "linkedInUrl": linkedin,
                     "industry": industry,
                     "foundedYear": founded
                 }
+                print(f"\n[GetProspect DEBUG] Retrieved Data for {clean_web}:\n{result_obj}\n")
+                return result_obj
             else:
                 print(f"[GetProspect API] No company profile resolved for {clean_web}.")
     except Exception as e:
@@ -754,23 +774,38 @@ async def query_mailboxlayer(email: str):
 async def query_gnews(company_name: str):
     api_key = os.getenv("GNEWS_API_KEY")
     if not api_key or api_key == "your_key_here" or api_key.strip() == "":
+        print("[GNews API] Key not configured.")
         return None
     try:
         url = "https://gnews.io/api/v4/search"
-        clean_name = company_name.replace("Limited", "").replace("Ltd", "").replace("LLC", "").replace("Inc", "").strip()
+        # Strip common legal entity suffixes to broaden search
+        clean_name = re.sub(r'\b(Limited|Ltd|LLC|Inc|Corporation|Corp|PLC|Pvt|Company)\b', '', company_name, flags=re.IGNORECASE).strip()
+        if not clean_name:
+            clean_name = company_name
+
+        print(f"[GNews API] Querying news for '{clean_name}'...")
         params = {"q": f'"{clean_name}"', "lang": "en", "max": 5, "apikey": api_key}
         async with httpx.AsyncClient() as client:
             res = await client.get(url, params=params, timeout=8.0)
+            print(f"[GNews API] Quoted Search HTTP {res.status_code}")
             articles = []
             if res.status_code == 200:
-                articles = res.json().get("articles", [])
+                data = res.json()
+                articles = data.get("articles", [])
+                print(f"[GNews API] Quoted Search found {len(articles)} article(s).")
+            else:
+                print(f"[GNews API] Error Body: {res.text}")
             
-            # If 0 results, try unquoted search
+            # If 0 results, fallback to unquoted search (e.g. Babylon Health without quotes)
             if not articles:
                 params_loose = {"q": clean_name, "lang": "en", "max": 5, "apikey": api_key}
+                print(f"[GNews API] Retrying with unquoted search for '{clean_name}'...")
                 res_loose = await client.get(url, params=params_loose, timeout=8.0)
+                print(f"[GNews API] Unquoted Search HTTP {res_loose.status_code}")
                 if res_loose.status_code == 200:
-                    articles = res_loose.json().get("articles", [])
+                    data_loose = res_loose.json()
+                    articles = data_loose.get("articles", [])
+                    print(f"[GNews API] Unquoted Search found {len(articles)} article(s).")
 
             if articles:
                 hits = []
@@ -783,6 +818,8 @@ async def query_gnews(company_name: str):
                     })
                 print(f"\n[GNews DEBUG] Retrieved Data for {company_name}:\n{hits}\n")
                 return hits
+            else:
+                print(f"[GNews API] No articles returned by GNews for {company_name} (Free plan only has last 30 days).")
     except Exception as e:
         print(f"[GNews API] Error: {e}")
     return None
@@ -1091,7 +1128,7 @@ async def execute_adk_verification(
     log_evidence(vendor_id, company_name, "URLScan.io Threat Scan", website, "200 OK" if urlscan_data else "No Result / Offline", urlscan_data)
     log_evidence(vendor_id, company_name, "VirusTotal Malware Scan", website, "200 OK" if virustotal_data else "No Result / Offline", virustotal_data)
     log_evidence(vendor_id, company_name, "Mailboxlayer Verification", f"info@{website}", "200 OK" if mailboxlayer_data else "No Result / Offline", mailboxlayer_data)
-    log_evidence(vendor_id, company_name, "GNews Litigation Press", company_name, "200 OK" if gnews_data else "No Result / Offline", gnews_data)
+    log_evidence(vendor_id, company_name, "GNews Litigation Press", company_name, "200 OK" if gnews_data else "Clear (0 in 30d)", gnews_data or {"status": "No articles in last 30 days", "coverage": "Clean / No recent adverse press"})
 
     open_corp_data = registry_data
 
@@ -1112,6 +1149,10 @@ async def execute_adk_verification(
     financial_report = "Financial Audit Report: Evaluated based on official registry status and corporate entity solvency signals."
 
     # 3. Parallelize Agents 2-6
+    digital_fallback_prompt = (
+        f"\nNOTE: Some domain API data is missing. Use your google_search tool to actively verify {website}'s official presence, company LinkedIn, domain history, and cybersecurity signals."
+        if (not whois_data or not link_finder_data or not urlscan_data) else ""
+    )
     digital_prompt = (
         f"{input_message} Corporate details: {corporate_raw}.\n"
         f"API Ground Truth Domain Data:\n"
@@ -1121,11 +1162,23 @@ async def execute_adk_verification(
         f"- URLScan.io Data: {json.dumps(urlscan_data) if urlscan_data else 'None'}\n"
         f"- VirusTotal Data: {json.dumps(virustotal_data) if virustotal_data else 'None'}\n"
         f"- Mailboxlayer MX Data: {json.dumps(mailboxlayer_data) if mailboxlayer_data else 'None'}"
+        f"{digital_fallback_prompt}"
     )
-    location_prompt = f"{input_message} Corporate details: {corporate_raw}. {f'Geoapify API metrics: {json.dumps(places_data)}' if places_data else ''}"
+
+    location_fallback_prompt = (
+        f"\nNOTE: Geocoding API returned limited data. Use your google_search tool to locate the physical operating headquarters or office of {company_name}."
+        if not places_data else ""
+    )
+    location_prompt = (
+        f"{input_message} Corporate details: {corporate_raw}.\n"
+        f"{f'Geoapify API metrics: {json.dumps(places_data)}' if places_data else 'None'}"
+        f"{location_fallback_prompt}"
+    )
+
     regulatory_prompt = (
         f"{input_message} Corporate details: {corporate_raw}.\n"
         f"OpenSanctions API Ground Truth Matches: {json.dumps(opensanctions_data) if opensanctions_data else 'None'}\n"
+        f"{'NOTE: No direct OpenSanctions API match found. Use your google_search tool to check for any trade sanctions, regulatory bans, or enforcement actions against ' + company_name + '.' if not opensanctions_data else ''}\n"
         f"{financial_report}"
     )
 
@@ -1142,9 +1195,13 @@ async def execute_adk_verification(
     # Pass corporate details to reputation and financial agents to prevent entity mismatch issues
     reputation_prompt = (
         f"{input_message} Corporate details: {corporate_raw}.\n"
-        f"GNews API Recent Articles: {json.dumps(gnews_data) if gnews_data else 'None'}"
+        f"GNews API Recent Articles: {json.dumps(gnews_data) if gnews_data else 'None'}\n"
+        f"{'CRITICAL: GNews returned 0 recent articles (free plan 30-day limit). You MUST actively use your google_search tool to search for historical adverse media, bankruptcy, lawsuits, controversies, and regulatory actions regarding ' + company_name + '.' if not gnews_data else ''}"
     )
-    financial_prompt = f"{input_message} Corporate details: {corporate_raw}.\n{financial_report}"
+    financial_prompt = (
+        f"{input_message} Corporate details: {corporate_raw}.\n{financial_report}\n"
+        f"Use your google_search tool to look up verified financial filings, revenue estimates, funding rounds, or solvency status for {company_name}."
+    )
     
     print("[Python ADK Orchestrator] Running Reputation Agent...")
     res_reputation = await run_agent(reputation_agent, reputation_prompt)
