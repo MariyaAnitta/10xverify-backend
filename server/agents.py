@@ -523,13 +523,10 @@ async def query_linkfinder(website: str):
             "Accept": "application/json"
         }
         
-        # 1. Try primary v2 company enrich endpoint (requires payload wrapped in a data array)
+        # 1. Try primary v2 company enrich endpoint
+        # GetProspect API v2 /v2/companies/enrich expects a flat JSON object: {"domain": clean_web}
         url_v2 = "https://api.getprospect.com/v2/companies/enrich"
-        payload_v2 = {
-            "data": [
-                {"domain": clean_web}
-            ]
-        }
+        payload_v2 = {"domain": clean_web}
         
         print(f"[GetProspect API] Requesting data for {clean_web} via POST /v2/companies/enrich...")
         async with httpx.AsyncClient() as client:
@@ -539,11 +536,10 @@ async def query_linkfinder(website: str):
             company = None
             if res.status_code == 200:
                 data = res.json()
-                data_list = data.get("data")
-                if isinstance(data_list, list) and len(data_list) > 0:
-                    company = data_list[0]
-                elif isinstance(data, dict):
-                    company = data.get("company") or data
+                if isinstance(data, dict):
+                    company = data.get("company") or data.get("data") or data
+                elif isinstance(data, list) and len(data) > 0:
+                    company = data[0]
             elif res.status_code != 404:
                 # 2. Fallback to v1 insights search if v2 returns non-200
                 url_v1 = "https://api.getprospect.com/public/v1/insights/companies"
@@ -653,25 +649,52 @@ async def query_urlscan(website: str):
     api_key = os.getenv("URLSCAN_API_KEY")
     if not api_key or api_key == "your_key_here" or api_key.strip() == "":
         return None
+    clean_web = website.replace("https://", "").replace("http://", "").strip("/").strip()
+    headers = {"API-Key": api_key, "Content-Type": "application/json"}
+    
     try:
-        url = f"https://urlscan.io/api/v1/search/?q=domain:{website}"
-        headers = {"API-Key": api_key}
+        # 1. Search existing scans using exact domain matching
+        search_url = f"https://urlscan.io/api/v1/search/?q=page.domain:{clean_web}&size=5"
         async with httpx.AsyncClient() as client:
-            res = await client.get(url, headers=headers, timeout=8.0)
+            res = await client.get(search_url, headers={"API-Key": api_key}, timeout=8.0)
             if res.status_code == 200:
                 results = res.json().get("results", [])
                 if results:
                     latest = results[0]
                     page = latest.get("page", {})
+                    stats = latest.get("stats", {})
+                    verdicts = latest.get("verdicts", {}).get("overall", {})
                     result_data = {
-                        "server": page.get("server"),
+                        "server": page.get("server") or "N/A",
                         "ip": page.get("ip"),
                         "country": page.get("country"),
                         "city": page.get("city"),
-                        "asn": page.get("asnname")
+                        "asn": page.get("asnname"),
+                        "malicious": verdicts.get("malicious", False),
+                        "score": verdicts.get("score", 0),
+                        "scanUrl": latest.get("result")
                     }
-                    print(f"\n[URLScan DEBUG] Retrieved Data for {website}:\n{result_data}\n")
+                    print(f"\n[URLScan DEBUG] Retrieved Historical Data for {clean_web}:\n{result_data}\n")
                     return result_data
+            
+            # 2. If no historical scan exists, submit an on-demand scan to URLScan.io
+            print(f"[URLScan API] No historical scans found for {clean_web}. Submitting live scan...")
+            scan_payload = {
+                "url": f"https://{clean_web}",
+                "visibility": "public",
+                "tags": ["10xverify-audit"]
+            }
+            scan_res = await client.post("https://urlscan.io/api/v1/scan/", json=scan_payload, headers=headers, timeout=8.0)
+            if scan_res.status_code in [200, 201]:
+                scan_data = scan_res.json()
+                result_data = {
+                    "status": "Scan Dispatched",
+                    "target": clean_web,
+                    "submissionUrl": scan_data.get("result"),
+                    "message": "Live sandbox scan queued on URLScan.io engine."
+                }
+                print(f"[URLScan API] Scan submitted successfully for {clean_web}: {result_data}")
+                return result_data
     except Exception as e:
         print(f"[URLScan API] Error: {e}")
     return None
@@ -734,11 +757,22 @@ async def query_gnews(company_name: str):
         return None
     try:
         url = "https://gnews.io/api/v4/search"
-        params = {"q": f'"{company_name}"', "lang": "en", "max": 5, "apikey": api_key}
+        clean_name = company_name.replace("Limited", "").replace("Ltd", "").replace("LLC", "").replace("Inc", "").strip()
+        params = {"q": f'"{clean_name}"', "lang": "en", "max": 5, "apikey": api_key}
         async with httpx.AsyncClient() as client:
             res = await client.get(url, params=params, timeout=8.0)
+            articles = []
             if res.status_code == 200:
                 articles = res.json().get("articles", [])
+            
+            # If 0 results, try unquoted search
+            if not articles:
+                params_loose = {"q": clean_name, "lang": "en", "max": 5, "apikey": api_key}
+                res_loose = await client.get(url, params=params_loose, timeout=8.0)
+                if res_loose.status_code == 200:
+                    articles = res_loose.json().get("articles", [])
+
+            if articles:
                 hits = []
                 for a in articles:
                     hits.append({
@@ -748,7 +782,7 @@ async def query_gnews(company_name: str):
                         "source": a.get("source", {}).get("name")
                     })
                 print(f"\n[GNews DEBUG] Retrieved Data for {company_name}:\n{hits}\n")
-                return hits if hits else None
+                return hits
     except Exception as e:
         print(f"[GNews API] Error: {e}")
     return None
