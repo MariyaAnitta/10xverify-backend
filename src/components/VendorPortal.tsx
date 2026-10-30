@@ -263,7 +263,9 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
       }
       
       setIsSubmitted(true);
+      setSubmissionStatus("Queue");
       setActiveStep(3);
+      await checkStatusAndLoad();
     } catch (e) {
       console.error(e);
       alert("Submission failed.");
@@ -586,7 +588,7 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
                     )}
 
                     {/* If New / Not Submitted */}
-                    {(submissionStatus === "New" || submissionStatus === "Draft") && (
+                    {!isSubmitted && (submissionStatus === "New" || submissionStatus === "Draft") && (
                       <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 mb-6 space-y-3 animate-fade-in">
                         <div className="flex items-start gap-3">
                           <FileText className="w-5 h-5 text-slate-500 shrink-0 mt-0.5" />
