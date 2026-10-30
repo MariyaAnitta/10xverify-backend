@@ -523,9 +523,13 @@ async def query_linkfinder(website: str):
             "Accept": "application/json"
         }
         
-        # 1. Try primary v2 company enrich endpoint
+        # 1. Try primary v2 company enrich endpoint (requires payload wrapped in a data array)
         url_v2 = "https://api.getprospect.com/v2/companies/enrich"
-        payload_v2 = {"domain": clean_web}
+        payload_v2 = {
+            "data": [
+                {"domain": clean_web}
+            ]
+        }
         
         print(f"[GetProspect API] Requesting data for {clean_web} via POST /v2/companies/enrich...")
         async with httpx.AsyncClient() as client:
@@ -535,9 +539,11 @@ async def query_linkfinder(website: str):
             company = None
             if res.status_code == 200:
                 data = res.json()
-                company = data.get("data") or data.get("company") or data
-                if isinstance(company, list) and len(company) > 0:
-                    company = company[0]
+                data_list = data.get("data")
+                if isinstance(data_list, list) and len(data_list) > 0:
+                    company = data_list[0]
+                elif isinstance(data, dict):
+                    company = data.get("company") or data
             elif res.status_code != 404:
                 # 2. Fallback to v1 insights search if v2 returns non-200
                 url_v1 = "https://api.getprospect.com/public/v1/insights/companies"
