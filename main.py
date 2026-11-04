@@ -1213,42 +1213,57 @@ async def check_sanctions(
             print(f"[check_sanctions] log_evidence error: {log_err}")
 
         is_hit = bool(res and res.get("totalHits", 0) > 0)
+        hits = res.get("hits", []) if res else []
+        
+        # Distinguish between active blocking sanctions and general regulatory/export notices
+        blocking_datasets = ["us_ofac_sdn", "eu_fsf", "gb_hmt_sanctions", "un_sc_sanctions", "ch_seco_sanctions"]
+        blocking_topics = ["sanction", "sanction.linked", "sanction.control"]
+        
+        has_blocking_sanction = False
+        top_hit = hits[0] if hits else {}
+        if hits:
+            for h in hits:
+                h_datasets = [d.lower() for d in h.get("datasets", [])]
+                h_topics = [t.lower() for t in h.get("topics", [])]
+                if any(bd in h_datasets for bd in blocking_datasets) or any(bt in h_topics for bt in blocking_topics):
+                    has_blocking_sanction = True
+                    top_hit = h
+                    break
+
         client_ip = get_client_ip(request)
+        result_label = "CRITICAL MATCH HIT" if has_blocking_sanction else ("REGULATORY NOTICE" if is_hit else "CLEAR")
         log_user_activity(
             user_email=x_user_email or "compliance@10xverify.ai",
             user_name=x_user_name or "Compliance Officer",
             user_role=x_user_role or "Compliance Officer",
             action="SANCTIONS_QUICK_CHECK",
             target=q.strip(),
-            details=f"Live OpenSanctions SDN screening check conducted for query '{q.strip()}'. Result: {'CRITICAL MATCH HIT' if is_hit else 'CLEAR'}.",
+            details=f"Live OpenSanctions screening check conducted for query '{q.strip()}'. Result: {result_label}.",
             ip_address=client_ip,
             status="SUCCESS"
         )
 
-        if is_hit:
-            hits = res.get("hits", [])
-            top_hit = hits[0]
-            caption = top_hit.get("caption", "Unknown Entity")
+        if has_blocking_sanction:
+            caption = top_hit.get("caption", q.strip())
             datasets = ", ".join(top_hit.get("datasets", []))
-            
-            summary_list = top_hit.get("summary", [])
-            topics_list = top_hit.get("topics", [])
-            countries_list = top_hit.get("countries", [])
-            
-            summary = " / ".join(summary_list) if isinstance(summary_list, list) else str(summary_list)
-            topics = ", ".join(topics_list) if isinstance(topics_list, list) else str(topics_list)
-            countries = ", ".join(countries_list) if isinstance(countries_list, list) else str(countries_list)
-            
-            details_str = f"CRITICAL ENTITY HIT: Match detected for '{caption}'. Targeted SDN/Watchlists: {datasets}."
-            if summary:
-                details_str += f" Summary: {summary}."
-            if countries:
-                details_str += f" Countries: {countries}."
-            if topics:
-                details_str += f" Topics: {topics}."
-                
+            topics = ", ".join(top_hit.get("topics", []))
+            details_str = f"CRITICAL SANCTION HIT: Entity '{caption}' is actively listed on primary international sanctions: {datasets}. Topics: {topics}."
             return {
                 "matchFound": True,
+                "isCriticalBlock": True,
+                "details": details_str,
+                "apiSource": "OpenSanctions API (Live v2)",
+                "rawPayload": res
+            }
+        elif is_hit:
+            # Regulatory or Export advisory notice (e.g. Microsoft past settlements)
+            caption = top_hit.get("caption", q.strip())
+            datasets = ", ".join(top_hit.get("datasets", []))
+            topics = ", ".join(top_hit.get("topics", []))
+            details_str = f"ADVISORY REGULATORY NOTICE: No active blocking sanctions found. Historical regulatory settlements or export records noted on: {datasets}. Topics: {topics}."
+            return {
+                "matchFound": False,
+                "isAdvisory": True,
                 "details": details_str,
                 "apiSource": "OpenSanctions API (Live v2)",
                 "rawPayload": res

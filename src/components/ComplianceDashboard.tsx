@@ -13,6 +13,7 @@ export default function ComplianceDashboard({ vendors, metrics, onVendorSelect }
   const [sanctionsResult, setSanctionsResult] = useState<{ 
     checked: boolean; 
     matchFound: boolean; 
+    isAdvisory?: boolean;
     details?: string; 
     apiSource?: string;
     rawPayload?: any;
@@ -42,6 +43,7 @@ export default function ComplianceDashboard({ vendors, metrics, onVendorSelect }
         setSanctionsResult({
           checked: true,
           matchFound: data.matchFound,
+          isAdvisory: data.isAdvisory,
           details: data.details,
           apiSource: data.apiSource,
           rawPayload: data.rawPayload
@@ -108,18 +110,26 @@ export default function ComplianceDashboard({ vendors, metrics, onVendorSelect }
             <div className={`mt-4 p-4 rounded-xl border text-xs leading-relaxed space-y-2.5 ${
               sanctionsResult.matchFound 
                 ? "bg-red-50 border-red-200 text-red-900 animate-pulse" 
+                : sanctionsResult.isAdvisory
+                ? "bg-amber-50 border-amber-200 text-amber-900"
                 : "bg-emerald-50 border-emerald-200 text-emerald-900"
             }`}>
               <div className="flex items-start gap-2.5">
                 {sanctionsResult.matchFound ? (
                   <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                ) : sanctionsResult.isAdvisory ? (
+                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                 ) : (
                   <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
                 )}
                 <div className="space-y-1 flex-1">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <span className="font-bold uppercase tracking-wider block">
-                      {sanctionsResult.matchFound ? "CRITICAL ENTITY HIT WARNING" : "SANITIZED PASS REPORT"}
+                      {sanctionsResult.matchFound 
+                        ? "CRITICAL ENTITY HIT WARNING" 
+                        : sanctionsResult.isAdvisory 
+                        ? "REGULATORY & EXPORT ADVISORY NOTICE" 
+                        : "SANITIZED PASS REPORT"}
                     </span>
                     <span className="px-2 py-0.5 bg-white/80 border border-slate-200 text-[9px] font-bold uppercase rounded-md text-slate-700">
                       Engine: {sanctionsResult.apiSource || "OpenSanctions API"}
@@ -129,6 +139,11 @@ export default function ComplianceDashboard({ vendors, metrics, onVendorSelect }
                   {sanctionsResult.matchFound && (
                     <p className="text-xxs text-red-600 font-bold uppercase tracking-widest mt-1">
                       DO NOT ENGAGE. BANNED TRANSACTION TRIGGER.
+                    </p>
+                  )}
+                  {sanctionsResult.isAdvisory && (
+                    <p className="text-xxs text-amber-700 font-bold uppercase tracking-widest mt-1">
+                      NON-BLOCKING NOTICE: Entity is not banned from commercial engagement.
                     </p>
                   )}
                 </div>

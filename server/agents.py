@@ -959,7 +959,8 @@ async def query_opensanctions(company_name: str):
         print(f"[OpenSanctions API] Missing or empty OPENSANCTIONS_API_KEY.")
         return None
     try:
-        url = "https://api.opensanctions.org/search/default"
+        # Query dedicated sanctions collection to eliminate non-sanction false positives (e.g. public company listings)
+        url = "https://api.opensanctions.org/search/sanctions"
         headers = {"Authorization": f"ApiKey {api_key.strip()}"}
         params = {
             "q": company_name,
