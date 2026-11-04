@@ -923,19 +923,79 @@ async def query_github_footprint(company_name: str):
         pass
     return None
 
-async def query_geoapify_places(address: str):
+COUNTRY_ISO_MAP = {
+    "united arab emirates": "ae",
+    "uae": "ae",
+    "saudi arabia": "sa",
+    "ksa": "sa",
+    "united kingdom": "gb",
+    "uk": "gb",
+    "great britain": "gb",
+    "united states": "us",
+    "usa": "us",
+    "india": "in",
+    "singapore": "sg",
+    "bahrain": "bh",
+    "qatar": "qa",
+    "kuwait": "kw",
+    "oman": "om",
+    "germany": "de",
+    "france": "fr",
+    "canada": "ca",
+    "australia": "au",
+    "netherlands": "nl",
+    "ireland": "ie",
+    "switzerland": "ch",
+    "china": "cn",
+    "japan": "jp",
+    "malaysia": "my"
+}
+
+async def query_geoapify_places(address: str, country: Optional[str] = None):
     api_key = os.getenv("GEOAPIFY_API_KEY")
     if not api_key or api_key == "your_key_here" or api_key.strip() == "":
         return None
     try:
+        # Strip P.O. Box numbers which confuse GIS geocoders (e.g. 'P.O. Box 11286')
+        clean_address = re.sub(r'(?i)\b(?:p\.?o\.?\s*box|post\s*office\s*box)\s*\d+[\s,]*', '', address).strip()
+        if not clean_address:
+            clean_address = address
+
+        # Determine ISO2 country code to strictly isolate geocoding to the target country
+        iso_code = None
+        if country:
+            clean_country = country.strip().lower()
+            iso_code = COUNTRY_ISO_MAP.get(clean_country)
+            if not iso_code and len(clean_country) == 2:
+                iso_code = clean_country
+
+        params = {
+            "text": clean_address,
+            "apiKey": api_key
+        }
+        if iso_code:
+            params["filter"] = f"countrycode:{iso_code}"
+
         url = "https://api.geoapify.com/v1/geocode/search"
         async with httpx.AsyncClient() as client:
-            res = await client.get(url, params={
-                "text": address,
-                "apiKey": api_key
-            }, timeout=5.0)
+            res = await client.get(url, params=params, timeout=5.0)
             if res.status_code == 200:
                 features = res.json().get("features", [])
+                
+                # If no features or 0-confidence, retry with city/district fallback
+                if (not features or features[0].get("properties", {}).get("rank", {}).get("confidence", 0) == 0) and "," in clean_address:
+                    parts = [p.strip() for p in clean_address.split(",") if p.strip()]
+                    if len(parts) >= 2:
+                        fallback_text = f"{parts[-2]}, {parts[-1]}"
+                        fb_params = {"text": fallback_text, "apiKey": api_key}
+                        if iso_code:
+                            fb_params["filter"] = f"countrycode:{iso_code}"
+                        fb_res = await client.get(url, params=fb_params, timeout=5.0)
+                        if fb_res.status_code == 200:
+                            fb_features = fb_res.json().get("features", [])
+                            if fb_features:
+                                features = fb_features
+
                 if features:
                     first = features[0]
                     properties = first.get("properties", {})
@@ -1142,7 +1202,7 @@ async def execute_adk_verification(
 
     # Resolve Places verification
     address_to_validate = corp_obj.get("registeredAddress") or f"{company_name}, {country}"
-    places_data = await query_geoapify_places(address_to_validate)
+    places_data = await query_geoapify_places(address_to_validate, country=country)
     
     log_evidence(vendor_id, company_name, "Geoapify GIS Geocoding", address_to_validate, "200 OK" if places_data else "No Result / Offline", places_data)
 
