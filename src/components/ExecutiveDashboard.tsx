@@ -14,6 +14,36 @@ export default function ExecutiveDashboard({ vendors, metrics, onVendorSelect, o
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedRiskFilter, setSelectedRiskFilter] = useState<string>("ALL");
   const [runningMonitoring, setRunningMonitoring] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
+
+  const handleExportExcel = async () => {
+    if (vendors.length === 0) {
+      alert("No vendor records available to export.");
+      return;
+    }
+    setExportingExcel(true);
+    try {
+      const response = await fetch("/api/vendors/export-excel");
+      if (!response.ok) {
+        throw new Error("Server responded with error while building Excel file");
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      const dateStr = new Date().toISOString().split("T")[0];
+      a.download = `10xVerify_Executive_Vendor_Ledger_${dateStr}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err: any) {
+      console.error(err);
+      alert("Error generating Excel ledger: " + (err.message || "Please try again."));
+    } finally {
+      setExportingExcel(false);
+    }
+  };
 
   const handleTriggerMonitoring = async () => {
     setRunningMonitoring(true);
@@ -190,6 +220,17 @@ export default function ExecutiveDashboard({ vendors, metrics, onVendorSelect, o
             </div>
             
             <div className="flex items-center gap-2">
+              <button
+                onClick={handleExportExcel}
+                disabled={exportingExcel}
+                style={{ height: '36px', boxSizing: 'border-box' }}
+                className="px-3.5 bg-emerald-700 hover:bg-emerald-800 text-white border border-emerald-700 font-semibold text-xs rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
+                title="Download 2-Tab Executive Vendor Master & Evidence Register"
+              >
+                <Download className={`w-3.5 h-3.5 text-emerald-100 ${exportingExcel ? "animate-bounce" : ""}`} />
+                <span>{exportingExcel ? "Generating Excel..." : "Export Executive Excel"}</span>
+              </button>
+
               <button
                 onClick={handleTriggerMonitoring}
                 disabled={runningMonitoring}

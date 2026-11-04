@@ -8,7 +8,7 @@ from firebase_admin import credentials, firestore
 from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse
+from fastapi.responses import FileResponse, HTMLResponse, Response
 from fastapi import Request
 from pydantic import BaseModel
 from typing import List, Optional
@@ -1019,6 +1019,41 @@ def get_vendors():
     # Sort by date descending
     db.sort(key=lambda x: x.get("screenedAt", ""), reverse=True)
     return db
+
+@app.get("/api/vendors/export-excel")
+def export_vendors_excel(request: Request):
+    try:
+        vendors = get_db()
+        vendors.sort(key=lambda x: x.get("screenedAt", ""), reverse=True)
+        
+        # Pull live audit evidence from Firestore
+        evidence_logs = []
+        try:
+            ev_docs = db_fs.collection("evidence_repository").stream()
+            for edoc in ev_docs:
+                evidence_logs.append(edoc.to_dict())
+            evidence_logs.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+        except Exception as e:
+            print(f"[export_vendors_excel] Evidence fetch warning: {e}")
+
+        from server.excel_generator import generate_vendor_excel_ledger
+        excel_bytes = generate_vendor_excel_ledger(vendors, evidence_logs)
+        
+        date_str = datetime.datetime.utcnow().strftime("%Y%m%d")
+        filename = f"10xVerify_Executive_Vendor_Ledger_{date_str}.xlsx"
+        
+        return Response(
+            content=excel_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}",
+                "Access-Control-Expose-Headers": "Content-Disposition"
+            }
+        )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to generate Excel ledger: {e}")
 
 @app.get("/api/analytics")
 def get_analytics():
