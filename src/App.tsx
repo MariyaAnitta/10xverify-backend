@@ -121,8 +121,15 @@ export default function App() {
             window.history.replaceState({}, document.title, "/");
           }
         }
-      } catch (err) {
-        console.error("[MSAL Redirect Handler Error]:", err);
+      } catch (err: any) {
+        const errMsg = err?.message || err?.errorMessage || String(err);
+        if (
+          !errMsg.includes("user_cancelled") && 
+          !errMsg.includes("User cancelled") &&
+          !errMsg.includes("interaction_in_progress")
+        ) {
+          console.error("[MSAL Redirect Handler Error]:", err);
+        }
       }
     }
     processMsalRedirect();

@@ -25,8 +25,20 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
       // Direct full-page redirect to Microsoft (NO POPUP!)
       await msalInstance.loginRedirect(loginRequest);
     } catch (err: any) {
-      console.error("Microsoft SSO Error:", err);
-      setError(err.message || "Failed to initiate Microsoft login.");
+      console.warn("Microsoft SSO notice:", err);
+      const errMsg = err?.message || err?.errorMessage || String(err);
+      // Suppress normal user cancellation/closing of the Microsoft prompt
+      if (
+        errMsg.includes("user_cancelled") || 
+        errMsg.includes("User cancelled") || 
+        errMsg.includes("cancelled") ||
+        errMsg.includes("interaction_in_progress")
+      ) {
+        // Silently reset loading state without showing red error banner
+        setError("");
+      } else {
+        setError(errMsg || "Failed to initiate Microsoft login.");
+      }
       setSsoLoading(false);
     }
   };
