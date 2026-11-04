@@ -145,7 +145,7 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
             </div>
           </div>
 
-          {error && (
+          {error && !error.toLowerCase().includes("user_cancelled") && !error.toLowerCase().includes("user cancelled") && (
             <div className="p-4 mb-6 bg-red-500/10 border border-red-500/20 rounded-xl text-sm text-red-400 font-medium">
               {error}
             </div>
