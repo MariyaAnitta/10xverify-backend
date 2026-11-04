@@ -404,31 +404,73 @@ export default function ScreeningPortal({ onScreeningComplete, autoStartVendor }
             </div>
           </div>
 
-          {/* Real-time Agent Log Terminal */}
-          <div className="bg-slate-900 rounded-xl p-4 font-mono text-xs text-slate-300 border border-slate-800 shadow-inner">
-            <div className="flex items-center justify-between border-b border-slate-800 pb-2 mb-3">
-              <span className="text-slate-400 text-xxs flex items-center gap-1">
-                <span className="w-2 justify-center h-2 bg-red-500 rounded-full inline-block animate-pulse"></span>
-                LIVE AGENT TELEMETRY FEED
+          {/* Executive Real-time Audit Card (Clean & Simple) */}
+          <div className="bg-white rounded-2xl p-6 border border-slate-200/80 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-ping"></div>
+                <h4 className="text-sm font-bold text-slate-800">
+                  {isFinalizing ? "Generating Executive Audit Dossier..." : "Automated Verification in Progress"}
+                </h4>
+              </div>
+              <span className="text-[11px] font-semibold text-slate-400 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-100">
+                Entity: {companyName || "Vendor"}
               </span>
-              <span className="text-xxs text-slate-500">Node: Sandbox-Ingress-Primary</span>
             </div>
-            <div className="space-y-1.5 max-h-48 overflow-y-auto flex flex-col-reverse">
-              {tickerLogs.map((log, idx) => {
-                let color = "text-slate-300";
-                if (log.includes("[INFO]")) color = "text-blue-400";
-                if (log.includes("[OK]")) color = "text-emerald-400";
-                if (log.includes("[PROCESS]")) color = "text-indigo-300";
-                if (log.includes("[ACTION]")) color = "text-amber-300";
-                if (log.includes("[SYSTEM]")) color = "text-purple-300";
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+              {STAGES.map((stage, idx) => {
+                const Icon = stage.icon;
+                const isPast = idx < currentStageIndex;
+                const isActive = idx === currentStageIndex;
+
+                let statusBadge = (
+                  <span className="text-[10px] font-medium text-slate-400 bg-slate-50 px-2 py-0.5 rounded-md">
+                    Queued
+                  </span>
+                );
+
+                if (isActive) {
+                  statusBadge = (
+                    <span className="text-[10px] font-bold text-blue-600 bg-blue-50 px-2.5 py-0.5 rounded-md flex items-center gap-1 animate-pulse border border-blue-100">
+                      <span className="w-1.5 h-1.5 bg-blue-600 rounded-full animate-ping"></span>
+                      Auditing...
+                    </span>
+                  );
+                } else if (isPast) {
+                  statusBadge = (
+                    <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md flex items-center gap-1 border border-emerald-100">
+                      <CheckCircle className="w-3 h-3 text-emerald-600" />
+                      Verified
+                    </span>
+                  );
+                }
 
                 return (
-                  <div key={idx} className={`${color} leading-relaxed break-all`}>
-                    <span className="text-slate-600 mr-1.5">[{new Date().toLocaleTimeString()}]</span>
-                    {log}
+                  <div
+                    key={stage.id}
+                    className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                      isActive
+                        ? "bg-blue-50/40 border-blue-200 shadow-xs"
+                        : isPast
+                        ? "bg-slate-50/60 border-slate-100"
+                        : "bg-white border-slate-100 opacity-60"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className={`p-1.5 rounded-lg ${isActive ? "bg-blue-100 text-blue-700" : isPast ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-400"}`}>
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <span className="text-xs font-semibold text-slate-700">{stage.name}</span>
+                    </div>
+                    {statusBadge}
                   </div>
                 );
               })}
+            </div>
+
+            <div className="pt-2 text-center text-xs text-slate-400">
+              Cross-referencing global corporate registries, trade watchlists, cybersecurity feeds, and public filings.
             </div>
           </div>
         </div>
