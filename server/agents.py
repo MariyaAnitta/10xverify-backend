@@ -185,6 +185,8 @@ location_agent = Agent(
     
     STABILITY RULE: If you find verified positive evidence (confirmed directors, confirmed address, confirmed licence), anchor your score to that evidence. Do not lower your score below 70% simply because some details could not be found through search — absence of search results is not evidence of risk for an established entity.
     
+    CRITICAL LOCATION FLOOR RULE: If the company is verified as an active commercial business with operating headquarters, regional offices, or branches in the country (e.g. Almarai, Nestle, Unilever operating subsidiaries), but the specific statutory registered street address was not found in public databases, you MUST score location in the 70-80 range (status "warning" or "success"). You must NEVER score 0% or below 50% for an established operating business simply because of a missing street number.
+    
     ANTI-HALLUCINATION RULE: Do not state that an address is "shared by other companies" or "a generic registration address" unless you have explicit proof. Many authentic companies are registered to residential addresses.
 
     CRITICAL FORMATTING RULE: Keep the "findings" extremely short, concise, and up to the point (maximum 1-2 sentences). Do NOT write long paragraphs.
@@ -283,6 +285,10 @@ reputation_agent = Agent(
       * Volume & Pattern: A single lawsuit vs. systematic/recurrent complaints across jurisdictions.
       * Source Credibility: Official regulatory findings vs. plaintiff law firms soliciting class actions.
       * Materiality: Financial/operational impact relative to the company's scale.
+    
+    BRAND IMPERSONATION SAFEGUARD: Fraudulent job offers, fake recruitment messages, or lottery scams impersonating a well-known brand (e.g. scammers using the name of Almarai, Emirates, Microsoft, or Tesco) are external phishing attacks targeting consumers. The target company is the VICTIM of brand abuse, not the perpetrator. You must NEVER deduct reputation points from the company for external scams that misuse its name.
+    
+    OFFICIAL CLEARANCE SAFEGUARD: If consumer rumors or product safety claims were investigated and officially dismissed/cleared by government authorities (e.g. Dubai Municipality, FDA, FSA), you must NOT deduct points for the debunked rumor.
     - Map the "status" strictly based on the score:
       * score >= 80: "success"
       * score 60-79: "warning"
@@ -726,10 +732,27 @@ async def query_virustotal(website: str):
         return None
     try:
         import base64
-        url_id = base64.urlsafe_b64encode(website.encode()).decode().strip("=")
-        url = f"https://www.virustotal.com/api/v3/urls/{url_id}"
+        clean_domain = website.lower().replace("https://", "").replace("http://", "").split("/")[0].strip()
         headers = {"x-apikey": api_key}
         async with httpx.AsyncClient() as client:
+            # 1. Try domains endpoint first (most reliable for root domains)
+            domain_url = f"https://www.virustotal.com/api/v3/domains/{clean_domain}"
+            res_d = await client.get(domain_url, headers=headers, timeout=8.0)
+            if res_d.status_code == 200:
+                data = res_d.json().get("data", {}).get("attributes", {})
+                stats = data.get("last_analysis_stats", {})
+                result_data = {
+                    "malicious": stats.get("malicious", 0),
+                    "phishing": stats.get("suspicious", 0),
+                    "reputation": data.get("reputation", 0)
+                }
+                print(f"\n[VirusTotal DEBUG] Retrieved Domain Data for {clean_domain}:\n{result_data}\n")
+                return result_data
+            
+            # 2. Fallback to canonical URL endpoint
+            canonical_url = f"https://{clean_domain}/"
+            url_id = base64.urlsafe_b64encode(canonical_url.encode()).decode().strip("=")
+            url = f"https://www.virustotal.com/api/v3/urls/{url_id}"
             res = await client.get(url, headers=headers, timeout=8.0)
             if res.status_code == 200:
                 data = res.json().get("data", {}).get("attributes", {})
@@ -739,7 +762,7 @@ async def query_virustotal(website: str):
                     "phishing": stats.get("suspicious", 0),
                     "reputation": data.get("reputation", 0)
                 }
-                print(f"\n[VirusTotal DEBUG] Retrieved Data for {website}:\n{result_data}\n")
+                print(f"\n[VirusTotal DEBUG] Retrieved URL Data for {canonical_url}:\n{result_data}\n")
                 return result_data
     except Exception as e:
         print(f"[VirusTotal API] Error: {e}")
@@ -1168,28 +1191,30 @@ async def execute_adk_verification(
             return None
         github_task = no_op_github()
 
+    clean_web = website.lower().replace("https://", "").replace("http://", "").split("/")[0].strip()
+
     print("[Python ADK Orchestrator] Starting external API queries in parallel...")
     registry_data, link_finder_data, whois_data, github_data, opensanctions_data, urlscan_data, virustotal_data, mailboxlayer_data, gnews_data = await asyncio.gather(
         registry_task,
-        query_linkfinder(website),
-        query_whoisjson(website),
+        query_linkfinder(clean_web),
+        query_whoisjson(clean_web),
         github_task,
         query_opensanctions(company_name),
-        query_urlscan(website),
-        query_virustotal(website),
-        query_mailboxlayer(f"info@{website}"),
+        query_urlscan(clean_web),
+        query_virustotal(clean_web),
+        query_mailboxlayer(f"info@{clean_web}"),
         query_gnews(company_name)
     )
     print("[Python ADK Orchestrator] External API queries completed. Starting Corporate Agent...")
     
     # LOG TRANSACTIONS TO EVIDENCE REPOSITORY IN FIRESTORE
     log_evidence(vendor_id, company_name, "Companies House / Registry", company_name, "200 OK" if registry_data else "No Result / Offline", registry_data)
-    log_evidence(vendor_id, company_name, "WhoisJSON WHOIS", website, "200 OK" if whois_data else "No Result / Offline", whois_data)
-    log_evidence(vendor_id, company_name, "LinkFinder Employees", website, "200 OK" if link_finder_data else "No Result / Offline", link_finder_data)
+    log_evidence(vendor_id, company_name, "WhoisJSON WHOIS", clean_web, "200 OK" if whois_data else "No Result / Offline", whois_data)
+    log_evidence(vendor_id, company_name, "LinkFinder Employees", clean_web, "200 OK" if link_finder_data else "No Result / Offline", link_finder_data)
     log_evidence(vendor_id, company_name, "OpenSanctions Screen", company_name, "200 OK" if opensanctions_data else "No Result / Offline", opensanctions_data)
-    log_evidence(vendor_id, company_name, "URLScan.io Threat Scan", website, "200 OK" if urlscan_data else "No Result / Offline", urlscan_data)
-    log_evidence(vendor_id, company_name, "VirusTotal Malware Scan", website, "200 OK" if virustotal_data else "No Result / Offline", virustotal_data)
-    log_evidence(vendor_id, company_name, "Mailboxlayer Verification", f"info@{website}", "200 OK" if mailboxlayer_data else "No Result / Offline", mailboxlayer_data)
+    log_evidence(vendor_id, company_name, "URLScan.io Threat Scan", clean_web, "200 OK" if urlscan_data else "No Result / Offline", urlscan_data)
+    log_evidence(vendor_id, company_name, "VirusTotal Malware Scan", clean_web, "200 OK" if virustotal_data else "No Result / Offline", virustotal_data)
+    log_evidence(vendor_id, company_name, "Mailboxlayer Verification", f"info@{clean_web}", "200 OK" if mailboxlayer_data else "No Result / Offline", mailboxlayer_data)
     log_evidence(vendor_id, company_name, "GNews Litigation Press", company_name, "200 OK" if gnews_data else "Clear (0 in 30d)", gnews_data or {"status": "No articles in last 30 days", "coverage": "Clean / No recent adverse press"})
 
     open_corp_data = registry_data
@@ -1201,8 +1226,12 @@ async def execute_adk_verification(
     print("[Python ADK Orchestrator] Corporate Agent completed. Running Places verification...")
     await asyncio.sleep(1.0)
 
-    # Resolve Places verification
-    address_to_validate = corp_obj.get("registeredAddress") or f"{company_name}, {country}"
+    # Resolve Places verification with strict fallback for unverified strings
+    raw_addr = corp_obj.get("registeredAddress")
+    if not raw_addr or any(w in str(raw_addr).lower() for w in ["unable", "not disclosed", "n/a", "unknown", "none", "not available"]):
+        address_to_validate = f"{company_name}, {country}"
+    else:
+        address_to_validate = str(raw_addr)
     places_data = await query_geoapify_places(address_to_validate, country=country)
     
     log_evidence(vendor_id, company_name, "Geoapify GIS Geocoding", address_to_validate, "200 OK" if places_data else "No Result / Offline", places_data)
