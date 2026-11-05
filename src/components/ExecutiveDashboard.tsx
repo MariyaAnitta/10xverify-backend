@@ -219,7 +219,7 @@ export default function ExecutiveDashboard({ vendors, metrics, onVendorSelect, o
               <p className="text-xs text-slate-500">Search and filter evaluated partner dossiers</p>
             </div>
             
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2.5 shrink-0">
               <button
                 onClick={handleExportExcel}
                 disabled={exportingExcel}
@@ -239,15 +239,6 @@ export default function ExecutiveDashboard({ vendors, metrics, onVendorSelect, o
               >
                 <RefreshCw className={`w-3.5 h-3.5 text-indigo-500 ${runningMonitoring ? "animate-spin" : ""}`} />
                 <span>{runningMonitoring ? "Auditing..." : "Run Weekly Audit Check"}</span>
-              </button>
- 
-              <button
-                onClick={onNewScreeningClick}
-                style={{ height: '36px', boxSizing: 'border-box' }}
-                className="px-4 bg-blue-600 hover:bg-blue-700 text-white border border-blue-600 font-semibold text-xs rounded-xl shadow-sm transition-all flex items-center justify-center gap-1.5 cursor-pointer shrink-0"
-              >
-                <Shield className="w-3.5 h-3.5 text-white fill-white/10" />
-                <span>Screen New Vendor</span>
               </button>
             </div>
           </div>
