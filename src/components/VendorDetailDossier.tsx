@@ -253,19 +253,19 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
           <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider pb-2 border-b border-slate-100">Legal Incorporations</h3>
           <div className="space-y-1">
             <div className="flex items-start justify-between gap-2.5 py-1.5 border-b border-slate-100/70 text-xs">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0">REG NUMBER:</span>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0 whitespace-nowrap">REG NUMBER:</span>
               <span className="font-bold text-slate-800 text-right break-all min-w-0 flex-1">{vendor.details.registrationNumber || "N/A"}</span>
             </div>
             <div className="flex items-start justify-between gap-2.5 py-1.5 border-b border-slate-100/70 text-xs">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0">INCORPORATED:</span>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0 whitespace-nowrap">INCORPORATED:</span>
               <span className="font-bold text-slate-800 text-right break-words min-w-0 flex-1">{vendor.details.incorporationDate || "N/A"}</span>
             </div>
             <div className="flex items-start justify-between gap-2.5 py-1.5 border-b border-slate-100/70 text-xs">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0">LEGAL STATUS:</span>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0 whitespace-nowrap">LEGAL STATUS:</span>
               <span className="font-bold text-slate-800 text-right break-words min-w-0 flex-1">{vendor.details.legalStatus || "N/A"}</span>
             </div>
             <div className="flex items-start justify-between gap-2.5 py-1.5 border-b border-slate-100/70 text-xs">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0">INDUSTRY TYPE:</span>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0 whitespace-nowrap">INDUSTRY TYPE:</span>
               <span className="font-bold text-slate-800 text-right break-words min-w-0 flex-1">{vendor.details.typeOfBusiness || "N/A"}</span>
             </div>
             <div className="py-2 border-b border-slate-100/70 space-y-1">
@@ -300,7 +300,7 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
               </p>
             </div>
             <div className="flex items-start justify-between gap-2.5 py-1.5 border-b border-slate-100/70 text-xs">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0">DOMAIN AGE:</span>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0 whitespace-nowrap">DOMAIN AGE:</span>
               <span className="font-bold text-slate-800 text-right break-words min-w-0 flex-1">
                 {typeof vendor.details.domainAgeDays === "number"
                   ? `${vendor.details.domainAgeDays} Days (${Math.round(vendor.details.domainAgeDays / 365)} years)`
@@ -308,11 +308,11 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
               </span>
             </div>
             <div className="flex items-start justify-between gap-2.5 py-1.5 border-b border-slate-100/70 text-xs">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0">DOMAIN REGISTRAR:</span>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0 whitespace-nowrap">DOMAIN REGISTRAR:</span>
               <span className="font-bold text-slate-800 text-right break-words min-w-0 flex-1">{vendor.details.domainRegistrar || "N/A"}</span>
             </div>
             <div className="flex items-start justify-between gap-2.5 pt-1.5 text-xs">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0">SSL SECURITY:</span>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0 whitespace-nowrap">SSL SECURITY:</span>
               <span className={`font-bold uppercase text-right min-w-0 flex-1 ${vendor.details.sslSecure ? "text-emerald-600" : "text-red-500"}`}>
                 {vendor.details.sslSecure ? "Secure / active" : "Unencrypted"}
               </span>
@@ -325,23 +325,23 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
           <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider pb-2 border-b border-slate-100">Compliance Checklists</h3>
           <div className="space-y-1">
             <div className="flex items-start justify-between gap-2.5 py-1.5 border-b border-slate-100/70 text-xs">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0">SOLVENCY INDEX:</span>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0 whitespace-nowrap">SOLVENCY INDEX:</span>
               <span className={`font-bold uppercase text-right min-w-0 flex-1 ${vendor.details.solvencyStatus === "Solvent" ? "text-emerald-600" : "text-red-500"}`}>
                 {vendor.details.solvencyStatus || "N/A"}
               </span>
             </div>
             <div className="flex items-start justify-between gap-2.5 py-1.5 border-b border-slate-100/70 text-xs">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0">CREDIT TIER EST:</span>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0 whitespace-nowrap">CREDIT TIER EST:</span>
               <span className="font-bold text-slate-800 text-right break-words min-w-0 flex-1">{vendor.details.creditScoreEst || "N/A"}</span>
             </div>
             <div className="flex items-start justify-between gap-2.5 py-1.5 border-b border-slate-100/70 text-xs">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0">SANCTIONS SDN STATUS:</span>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0 whitespace-nowrap">SANCTIONS SDN STATUS:</span>
               <span className={`font-bold uppercase text-right min-w-0 flex-1 ${vendor.details.sanctionsRisk === "None" ? "text-emerald-600" : "text-red-500 animate-pulse"}`}>
                 {vendor.details.sanctionsRisk || "N/A"}
               </span>
             </div>
             <div className="flex items-start justify-between gap-2.5 py-1.5 border-b border-slate-100/70 text-xs">
-              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0">ADVERSE PRESS FOUND:</span>
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0 whitespace-nowrap">ADVERSE PRESS FOUND:</span>
               <span className={`font-bold uppercase text-right min-w-0 flex-1 ${vendor.details.adverseMediaFound ? "text-red-500" : "text-emerald-600"}`}>
                 {vendor.details.adverseMediaFound ? "ALERT REVIEWS DETECTED" : "None"}
               </span>
