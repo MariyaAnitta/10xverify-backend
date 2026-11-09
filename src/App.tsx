@@ -382,23 +382,26 @@ export default function App() {
       {/* Navigation Rails */}
       <nav className="bg-white border-b border-slate-100 px-6 py-2">
         <div className="max-w-7xl mx-auto flex items-center gap-1.5 overflow-x-auto pb-1 md:pb-0">
-          {[
-            { id: "executive", label: "Executive Dashboard", desc: "Board overview", icon: LayoutGrid },
-            { id: "procurement", label: "Procurement Workflows", desc: "Fast triage desk", icon: CheckSquare },
-            { id: "compliance", label: "Compliance & Blacklists", desc: "SDN & regulatory logs", icon: Shield },
-            { id: "metrics", label: "Risk Metrics", desc: "Platform analytics", icon: Activity },
-            { id: "screen", label: "Workforce Screening", desc: "Deploy AI Agents", icon: Brain },
-            { id: "vendor-queue", label: "Vendor Portal Queue", desc: "Audit registrations", icon: ClipboardList },
-            { id: "evidence", label: "Evidence Logs", desc: "Audit registry pack", icon: Database },
-            { id: "activity-logs", label: "User Activity Logs", desc: "Audit trail & security", icon: ShieldCheck }
-          ].filter(tab => {
-            // Enterprise role separation: Vetting Officers focus on operational due diligence & screening.
-            // Security Audit Trails and Platform Risk Metrics are reserved for Compliance Officers.
-            if (currentUser.role === "Vetting Officer") {
-              return tab.id !== "activity-logs" && tab.id !== "metrics";
-            }
-            return true;
-          }).map(tab => {
+          {(currentUser.role === "Vetting Officer"
+            ? [
+                { id: "executive", label: "Executive Dashboard", desc: "Board overview", icon: LayoutGrid },
+                { id: "screen", label: "Workforce Screening", desc: "Deploy AI Agents", icon: Brain },
+                { id: "procurement", label: "Procurement Workflows", desc: "Fast triage desk", icon: CheckSquare },
+                { id: "compliance", label: "Compliance & Blacklists", desc: "SDN & regulatory logs", icon: Shield },
+                { id: "vendor-queue", label: "Vendor Portal Queue", desc: "Audit registrations", icon: ClipboardList },
+                { id: "evidence", label: "Evidence Logs", desc: "Audit registry pack", icon: Database }
+              ]
+            : [
+                { id: "executive", label: "Executive Dashboard", desc: "Board overview", icon: LayoutGrid },
+                { id: "procurement", label: "Procurement Workflows", desc: "Fast triage desk", icon: CheckSquare },
+                { id: "compliance", label: "Compliance & Blacklists", desc: "SDN & regulatory logs", icon: Shield },
+                { id: "metrics", label: "Risk Metrics", desc: "Platform analytics", icon: Activity },
+                { id: "screen", label: "Workforce Screening", desc: "Deploy AI Agents", icon: Brain },
+                { id: "vendor-queue", label: "Vendor Portal Queue", desc: "Audit registrations", icon: ClipboardList },
+                { id: "evidence", label: "Evidence Logs", desc: "Audit registry pack", icon: Database },
+                { id: "activity-logs", label: "User Activity Logs", desc: "Audit trail & security", icon: ShieldCheck }
+              ]
+          ).map(tab => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id && !selectedVendorId;
 
