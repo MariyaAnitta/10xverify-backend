@@ -126,7 +126,7 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
               className="flex items-center gap-1.5 px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-all cursor-pointer border border-slate-200"
             >
               <Printer className="w-4 h-4" />
-              <span>Toggle PDF Print Layout</span>
+              <span>Preview Print Layout</span>
             </button>
 
             <button
@@ -138,7 +138,7 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
               }}
               className="flex items-center gap-1.5 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold rounded-xl transition-all cursor-pointer shadow-sm border border-slate-900"
             >
-              <Printer className="w-4 h-4 text-emerald-450 fill-emerald-450/20" />
+              <Printer className="w-4 h-4 text-emerald-400" />
               <span>Download PDF Report</span>
             </button>
           </div>
@@ -146,16 +146,28 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
       )}
 
       {pdfMode && (
-        <div className="flex justify-between items-center bg-slate-50 p-4 rounded-xl border border-dashed border-slate-200 mb-6 print:hidden">
-          <span className="text-xxs text-slate-500 font-mono">
-            🖨️ EMULATED BOARD PRINT PREVIEW. (To print this document, click your browser Print / File action command).
-          </span>
-          <button
-            onClick={() => setPdfMode(false)}
-            className="px-3 py-1 bg-slate-900 text-white text-xxs font-bold rounded-lg hover:bg-slate-800"
-          >
-            Return to Dynamic Web Console
-          </button>
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 bg-slate-50 p-4 rounded-xl border border-dashed border-slate-200 mb-6 print:hidden">
+          <div className="flex items-center gap-2">
+            <Printer className="w-4 h-4 text-slate-500 shrink-0" />
+            <span className="text-xs text-slate-600 font-medium">
+              Board Report Print Preview (A4 Layout)
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => window.print()}
+              className="px-3.5 py-1.5 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-lg flex items-center gap-1.5 cursor-pointer shadow-sm"
+            >
+              <Printer className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Print / Save PDF</span>
+            </button>
+            <button
+              onClick={() => setPdfMode(false)}
+              className="px-3.5 py-1.5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs font-bold rounded-lg cursor-pointer"
+            >
+              Exit Preview
+            </button>
+          </div>
         </div>
       )}
 
