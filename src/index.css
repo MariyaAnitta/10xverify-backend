@@ -1,6 +1,14 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
+@theme {
+  --color-slate-850: #172033;
+  --color-slate-650: #404e68;
+  --color-slate-450: #8896ab;
+  --color-slate-550: #55657e;
+  --color-emerald-450: #10b981;
+}
+
 :root {
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-display: 'Outfit', sans-serif;
@@ -102,7 +110,17 @@
   -webkit-text-fill-color: transparent;
 }
 
+/* Consistent Typography & Micro-Utility Helpers */
+.text-xxs {
+  font-size: 0.6875rem !important; /* 11px */
+  line-height: 1rem !important;
+}
+
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
   body * {
     visibility: hidden;
   }
@@ -113,14 +131,29 @@
     position: absolute;
     left: 0;
     top: 0;
-    width: 100%;
+    width: 100% !important;
     max-width: 100% !important;
     border: none !important;
     box-shadow: none !important;
     padding: 0 !important;
     margin: 0 !important;
     background: white !important;
-    color: black !important;
+    color: #0f172a !important;
+  }
+  #vendor-dossier .grid {
+    display: grid !important;
+  }
+  /* Avoid page breaks inside cards */
+  #vendor-dossier .bg-white {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+  /* Prevent text overflow in print layout */
+  #vendor-dossier * {
+    overflow-wrap: break-word !important;
+  }
+  .break-all {
+    word-break: break-all !important;
   }
   header, nav, footer, button, .print\:hidden, [role="button"] {
     display: none !important;

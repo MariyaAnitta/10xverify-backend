@@ -237,10 +237,10 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
         {/* Executive summary details */}
         <div className="bg-white p-5 rounded-xl border border-slate-100 space-y-3">
           <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest">Executive Risk Summary</h3>
-          <p className="text-xs text-slate-650 leading-relaxed font-sans">{vendor.executiveSummary}</p>
-          <div className="pt-3 border-t border-slate-50 text-xxs text-slate-500 flex items-start gap-2">
-            <b className="uppercase text-slate-800 shrink-0 mt-0.5">Primary Directive:</b>
-            <span className="italic">"{vendor.recommendation}"</span>
+          <p className="text-xs text-slate-700 leading-relaxed font-sans">{vendor.executiveSummary}</p>
+          <div className="pt-3 border-t border-slate-100 text-xs text-slate-500 flex items-start gap-2">
+            <b className="uppercase text-slate-800 shrink-0 mt-0.5 text-[11px] tracking-wide">Primary Directive:</b>
+            <span className="italic font-medium text-slate-700">"{vendor.recommendation}"</span>
           </div>
         </div>
       </div>
@@ -249,34 +249,34 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
         {/* Registry Card */}
-        <div className="bg-white border p-5 rounded-2xl border-slate-100 shadow-sm space-y-4">
-          <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest pb-1 border-b">Legal Incorporations</h3>
-          <div className="space-y-2.5 text-xxs">
-            <div className="flex justify-between">
-              <span className="text-slate-400 font-semibold">REG NUMBER:</span>
-              <span className="font-bold text-slate-800">{vendor.details.registrationNumber || "N/A"}</span>
+        <div className="bg-white border p-5 rounded-2xl border-slate-100 shadow-sm space-y-3">
+          <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider pb-2 border-b border-slate-100">Legal Incorporations</h3>
+          <div className="space-y-1">
+            <div className="flex items-start justify-between gap-2.5 py-1.5 border-b border-slate-100/70 text-xs">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0">REG NUMBER:</span>
+              <span className="font-bold text-slate-800 text-right break-all min-w-0 flex-1">{vendor.details.registrationNumber || "N/A"}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400 font-semibold">INCORPORATED:</span>
-              <span className="font-bold text-slate-800">{vendor.details.incorporationDate || "N/A"}</span>
+            <div className="flex items-start justify-between gap-2.5 py-1.5 border-b border-slate-100/70 text-xs">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0">INCORPORATED:</span>
+              <span className="font-bold text-slate-800 text-right break-words min-w-0 flex-1">{vendor.details.incorporationDate || "N/A"}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400 font-semibold">LEGAL STATUS:</span>
-              <span className="font-bold text-slate-800">{vendor.details.legalStatus || "N/A"}</span>
+            <div className="flex items-start justify-between gap-2.5 py-1.5 border-b border-slate-100/70 text-xs">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0">LEGAL STATUS:</span>
+              <span className="font-bold text-slate-800 text-right break-words min-w-0 flex-1">{vendor.details.legalStatus || "N/A"}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400 font-semibold">INDUSTRY TYPE:</span>
-              <span className="font-bold text-slate-800">{vendor.details.typeOfBusiness || "N/A"}</span>
+            <div className="flex items-start justify-between gap-2.5 py-1.5 border-b border-slate-100/70 text-xs">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0">INDUSTRY TYPE:</span>
+              <span className="font-bold text-slate-800 text-right break-words min-w-0 flex-1">{vendor.details.typeOfBusiness || "N/A"}</span>
             </div>
-            <div className="space-y-1">
-              <span className="text-slate-400 font-semibold block uppercase">Directors:</span>
-              <p className="font-bold text-slate-800 leading-normal pl-2 border-l border-slate-200">
+            <div className="py-2 border-b border-slate-100/70 space-y-1">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide block">DIRECTORS:</span>
+              <p className="text-xs font-bold text-slate-800 leading-normal pl-2.5 border-l-2 border-slate-200 break-words">
                 {Array.isArray(vendor.details.directors) ? vendor.details.directors.join(", ") : String(vendor.details.directors || "No directors parsed")}
               </p>
             </div>
-            <div className="space-y-1">
-              <span className="text-slate-400 font-semibold block uppercase">Shareholders & UBOs:</span>
-              <p className="font-bold text-slate-800 leading-normal pl-2 border-l border-slate-200">
+            <div className="pt-2 space-y-1">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide block">SHAREHOLDERS & UBOS:</span>
+              <p className="text-xs font-bold text-slate-800 leading-normal pl-2.5 border-l-2 border-slate-200 break-words">
                 {Array.isArray(vendor.details.shareholders) ? vendor.details.shareholders.join(", ") : String(vendor.details.shareholders || "Opaque holdings profile")}
               </p>
             </div>
@@ -284,32 +284,36 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
         </div>
 
         {/* Digital & Address validation Card */}
-        <div className="bg-white border p-5 rounded-2xl border-slate-100 shadow-sm space-y-4">
-          <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest pb-1 border-b">Physical & Digital Audit</h3>
-          <div className="space-y-2.5 text-xxs">
-            <div className="space-y-1">
-              <span className="text-slate-400 font-semibold block">REGISTERED REGISTERED OFFICE:</span>
-              <span className="font-bold text-slate-800">{vendor.details.registeredAddress || "N/A"}</span>
+        <div className="bg-white border p-5 rounded-2xl border-slate-100 shadow-sm space-y-3">
+          <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider pb-2 border-b border-slate-100">Physical & Digital Audit</h3>
+          <div className="space-y-1">
+            <div className="py-2 border-b border-slate-100/70 space-y-1">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide block">REGISTERED OFFICE:</span>
+              <p className="text-xs font-bold text-slate-800 leading-normal pl-2.5 border-l-2 border-slate-200 break-words">
+                {vendor.details.registeredAddress || "N/A"}
+              </p>
             </div>
-            <div className="space-y-1 bg-slate-50 p-2 rounded">
-              <span className="text-slate-400 font-semibold block">MAP VALIDATION:</span>
-              <span className="font-bold text-slate-800">{vendor.details.validatedAddress || "N/A"}</span>
+            <div className="py-2 border-b border-slate-100/70 space-y-1">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide block">MAP VALIDATION:</span>
+              <p className="text-xs font-bold text-slate-800 leading-normal pl-2.5 border-l-2 border-slate-200 break-words">
+                {vendor.details.validatedAddress || "N/A"}
+              </p>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400 font-semibold">DOMAIN AGE:</span>
-              <span className="font-bold text-slate-800">
+            <div className="flex items-start justify-between gap-2.5 py-1.5 border-b border-slate-100/70 text-xs">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0">DOMAIN AGE:</span>
+              <span className="font-bold text-slate-800 text-right break-words min-w-0 flex-1">
                 {typeof vendor.details.domainAgeDays === "number"
                   ? `${vendor.details.domainAgeDays} Days (${Math.round(vendor.details.domainAgeDays / 365)} years)`
                   : String(vendor.details.domainAgeDays || "N/A")}
               </span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400 font-semibold">DOMAIN REGISTRAR:</span>
-              <span className="font-bold text-slate-800">{vendor.details.domainRegistrar || "N/A"}</span>
+            <div className="flex items-start justify-between gap-2.5 py-1.5 border-b border-slate-100/70 text-xs">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0">DOMAIN REGISTRAR:</span>
+              <span className="font-bold text-slate-800 text-right break-words min-w-0 flex-1">{vendor.details.domainRegistrar || "N/A"}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400 font-semibold">SSL SECURITY:</span>
-              <span className={`font-bold uppercase ${vendor.details.sslSecure ? "text-emerald-600" : "text-red-500"}`}>
+            <div className="flex items-start justify-between gap-2.5 pt-1.5 text-xs">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0">SSL SECURITY:</span>
+              <span className={`font-bold uppercase text-right min-w-0 flex-1 ${vendor.details.sslSecure ? "text-emerald-600" : "text-red-500"}`}>
                 {vendor.details.sslSecure ? "Secure / active" : "Unencrypted"}
               </span>
             </div>
@@ -317,34 +321,34 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
         </div>
 
         {/* Compliance clearances Card */}
-        <div className="bg-white border p-5 rounded-2xl border-slate-100 shadow-sm space-y-4">
-          <h3 className="text-xs font-bold text-slate-900 uppercase tracking-widest pb-1 border-b">Compliance Checklists</h3>
-          <div className="space-y-2.5 text-xxs">
-            <div className="flex justify-between">
-              <span className="text-slate-400 font-semibold">SOLVENCY INDEX:</span>
-              <span className={`font-bold uppercase ${vendor.details.solvencyStatus === "Solvent" ? "text-emerald-600" : "text-red-500"}`}>
+        <div className="bg-white border p-5 rounded-2xl border-slate-100 shadow-sm space-y-3">
+          <h3 className="text-xs font-bold text-slate-900 uppercase tracking-wider pb-2 border-b border-slate-100">Compliance Checklists</h3>
+          <div className="space-y-1">
+            <div className="flex items-start justify-between gap-2.5 py-1.5 border-b border-slate-100/70 text-xs">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0">SOLVENCY INDEX:</span>
+              <span className={`font-bold uppercase text-right min-w-0 flex-1 ${vendor.details.solvencyStatus === "Solvent" ? "text-emerald-600" : "text-red-500"}`}>
                 {vendor.details.solvencyStatus || "N/A"}
               </span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400 font-semibold">CREDIT TIER EST:</span>
-              <span className="font-bold text-slate-800">{vendor.details.creditScoreEst || "N/A"}</span>
+            <div className="flex items-start justify-between gap-2.5 py-1.5 border-b border-slate-100/70 text-xs">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0">CREDIT TIER EST:</span>
+              <span className="font-bold text-slate-800 text-right break-words min-w-0 flex-1">{vendor.details.creditScoreEst || "N/A"}</span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400 font-semibold">SANCTIONS SDN STATUS:</span>
-              <span className={`font-bold uppercase ${vendor.details.sanctionsRisk === "None" ? "text-emerald-600" : "text-red-500 animate-pulse"}`}>
+            <div className="flex items-start justify-between gap-2.5 py-1.5 border-b border-slate-100/70 text-xs">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0">SANCTIONS SDN STATUS:</span>
+              <span className={`font-bold uppercase text-right min-w-0 flex-1 ${vendor.details.sanctionsRisk === "None" ? "text-emerald-600" : "text-red-500 animate-pulse"}`}>
                 {vendor.details.sanctionsRisk || "N/A"}
               </span>
             </div>
-            <div className="flex justify-between">
-              <span className="text-slate-400 font-semibold">ADVERSE PRESS FOUND:</span>
-              <span className={`font-bold uppercase ${vendor.details.adverseMediaFound ? "text-red-500" : "text-emerald-600"}`}>
+            <div className="flex items-start justify-between gap-2.5 py-1.5 border-b border-slate-100/70 text-xs">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide shrink-0">ADVERSE PRESS FOUND:</span>
+              <span className={`font-bold uppercase text-right min-w-0 flex-1 ${vendor.details.adverseMediaFound ? "text-red-500" : "text-emerald-600"}`}>
                 {vendor.details.adverseMediaFound ? "ALERT REVIEWS DETECTED" : "None"}
               </span>
             </div>
-            <div className="space-y-1">
-              <span className="text-slate-400 font-semibold block uppercase">Licenses Audited:</span>
-              <p className="font-bold text-slate-850 pl-2 border-l border-slate-205">
+            <div className="pt-2 space-y-1">
+              <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide block">LICENSES AUDITED:</span>
+              <p className="text-xs font-bold text-slate-800 leading-normal pl-2.5 border-l-2 border-slate-200 break-words">
                 {Array.isArray(vendor.details.complianceLicenses) ? vendor.details.complianceLicenses.join(" • ") : String(vendor.details.complianceLicenses || "None")}
               </p>
             </div>
@@ -353,10 +357,10 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
       </div>
 
       {/* Accordion folders for active agents findings */}
-      <div className="bg-white border border-slate-100 rounded-2xl p-6  space-y-4 shadow-sm">
+      <div className="bg-white border border-slate-100 rounded-2xl p-6 space-y-4 shadow-sm">
         <div className="border-b pb-2">
-          <h3 className="text-sm font-bold text-slate-950 uppercase tracking-wider">Agents Execution Findings dossier</h3>
-          <p className="text-xxs text-slate-400 font-medium">Click on individual agent dossiers to reveal complete evidence chains</p>
+          <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Agents Execution Findings Dossier</h3>
+          <p className="text-xs text-slate-400 font-medium">Click on individual agent dossiers to reveal complete evidence chains</p>
         </div>
 
         <div className="space-y-3">
@@ -378,7 +382,7 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
  
                   {!pdfMode && (
                     <div className="flex items-center gap-2">
-                      <span className="text-xxs text-slate-400 uppercase tracking-widest font-semibold hidden sm:inline">Folder dossier</span>
+                      <span className="text-xs text-slate-400 uppercase tracking-wider font-semibold hidden sm:inline">Dossier Folder</span>
                       {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
                     </div>
                   )}
@@ -387,34 +391,34 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
                 {isExpanded && (
                   <div className="p-4 space-y-4 bg-white border-t border-slate-50">
                     <div className="space-y-1">
-                      <span className="text-xxs font-bold text-slate-400 uppercase tracking-wider block">Agent Assessment Ledger</span>
-                      <p className="text-slate-700 leading-relaxed font-sans">{results.outputMessage}</p>
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Agent Assessment Ledger</span>
+                      <p className="text-xs text-slate-700 leading-relaxed font-sans">{results.outputMessage}</p>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       {/* Evidence registry */}
-                      <div className="bg-slate-50/40 p-3 rounded-lg border border-slate-100 space-y-1">
-                        <span className="text-[10px] font-bold text-slate-450 uppercase block mb-1">Evidence Records</span>
+                      <div className="bg-slate-50/60 p-3 rounded-lg border border-slate-100 space-y-1.5">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase block tracking-wider mb-1">Evidence Records</span>
                         <ul className="space-y-1">
                           {Array.isArray(results.evidence) ? results.evidence.map((ev, i) => (
-                            <li key={i} className="text-xxs text-slate-650 flex items-start gap-1.5">
-                              <span className="text-indigo-500">•</span>
-                              <span className="font-semibold leading-relaxed font-mono">{ev}</span>
+                            <li key={i} className="text-xs text-slate-700 flex items-start gap-1.5">
+                              <span className="text-indigo-500 font-bold">•</span>
+                              <span className="font-medium leading-relaxed font-mono">{ev}</span>
                             </li>
-                          )) : <li className="text-xxs text-slate-550">{String(results.evidence || "")}</li>}
+                          )) : <li className="text-xs text-slate-600">{String(results.evidence || "")}</li>}
                         </ul>
                       </div>
 
                       {/* Code findings */}
-                      <div className="bg-slate-5 limit border p-3 rounded-lg border-slate-100 space-y-1">
-                        <span className="text-[10px] font-bold text-slate-450 uppercase block mb-1">Core Audit Findings</span>
+                      <div className="bg-slate-50/60 p-3 rounded-lg border border-slate-100 space-y-1.5">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase block tracking-wider mb-1">Core Audit Findings</span>
                         <ul className="space-y-1">
                           {Array.isArray(results.keyFindings) ? results.keyFindings.map((kf, i) => (
-                            <li key={i} className="text-xxs text-slate-650 flex items-start gap-1.5 font-sans">
-                              <span className="text-rose-500">✓</span>
+                            <li key={i} className="text-xs text-slate-700 flex items-start gap-1.5 font-sans">
+                              <span className="text-emerald-600 font-bold">✓</span>
                               <span className="font-medium">{kf}</span>
                             </li>
-                          )) : <li className="text-xxs text-slate-550">{String(results.keyFindings || "")}</li>}
+                          )) : <li className="text-xs text-slate-600">{String(results.keyFindings || "")}</li>}
                         </ul>
                       </div>
                     </div>
