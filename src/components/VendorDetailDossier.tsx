@@ -83,20 +83,25 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
             {currentUser?.role === "Compliance Officer" && (
               <button
                 onClick={async () => {
-                  if (!window.confirm(`Are you sure you want to Unlock & Re-open the onboarding application for ${vendor.companyName}? This will reset their verified status back to a draft.`)) {
+                  if (!window.confirm(`Are you sure you want to Unlock & Re-open the onboarding application for ${vendor.companyName}? This will reset their verified status back to a draft for editing or re-screening.`)) {
                     return;
                   }
                   const email = vendor.details?.contactEmail || vendor.contactEmail;
-                  if (!email) {
-                    alert("Vendor contact email not found. Cannot unlock.");
-                    return;
-                  }
+                  const endpoint = email 
+                    ? `/api/vendors/by-email/${encodeURIComponent(email)}/unlock`
+                    : `/api/vendors/${encodeURIComponent(vendor.id)}/unlock`;
+
                   try {
-                    const res = await fetch(`/api/vendors/by-email/${email}/unlock`, {
-                      method: "POST"
+                    const res = await fetch(endpoint, {
+                      method: "POST",
+                      headers: {
+                        "X-User-Role": currentUser?.role || "Compliance Officer",
+                        "X-User-Email": currentUser?.email || "",
+                        "X-User-Name": currentUser?.name || ""
+                      }
                     });
                     if (res.ok) {
-                      alert("Onboarding application has been unlocked successfully. Vendor can now edit from their portal.");
+                      alert(`Onboarding application for ${vendor.companyName} has been unlocked successfully. Record reset for editing and re-screening.`);
                       onBack();
                     } else {
                       alert("Failed to unlock vendor application.");

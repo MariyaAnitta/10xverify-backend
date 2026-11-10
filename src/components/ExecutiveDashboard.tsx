@@ -50,13 +50,14 @@ export default function ExecutiveDashboard({ vendors, metrics, onVendorSelect, o
     try {
       const res = await fetch("/api/monitoring-alerts/trigger", { method: "POST" });
       if (res.ok) {
-        alert("Weekly audit check launched in the background! Registry re-verification is running.");
+        alert("Weekly audit check launched successfully in the background! Continuous registry & adverse press re-verification is running.");
       } else {
-        alert("Failed to trigger monitoring audit.");
+        const data = await res.json().catch(() => ({}));
+        alert("Failed to trigger monitoring audit: " + (data.detail || "Server error"));
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error(e);
-      alert("Error triggering monitoring audit.");
+      alert("Error triggering monitoring audit: " + (e?.message || "Network error"));
     } finally {
       setRunningMonitoring(false);
     }

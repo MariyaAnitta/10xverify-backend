@@ -5,7 +5,7 @@ import hashlib
 import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, Header, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, HTMLResponse, Response
@@ -690,13 +690,13 @@ def delete_monitoring_alert(alert_id: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/monitoring-alerts/trigger")
-def force_trigger_monitoring():
+async def force_trigger_monitoring(background_tasks: BackgroundTasks):
     try:
         now = datetime.datetime.utcnow()
         db_fs.collection("system_config").document("monitoring_status").set({
             "lastRunAt": now.isoformat() + "Z"
         })
-        asyncio.create_task(run_continuous_monitoring_audit())
+        background_tasks.add_task(run_continuous_monitoring_audit)
         return {"status": "success", "message": "Continuous monitoring audit triggered in background."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -868,17 +868,25 @@ def get_vendor_by_email(email: str):
 @app.post("/api/vendors/by-email/{email}/unlock")
 def unlock_vendor(email: str, request: Request):
     try:
+        clean_email = email.strip().lower()
         # Find and delete from "vendors"
         docs = db_fs.collection("vendors").stream()
         vendor_data = None
+        vendor_id_found = None
         for doc in docs:
             data = doc.to_dict()
-            if data.get("contactEmail", "").lower() == email.lower() or data.get("details", {}).get("contactEmail", "").lower() == email.lower() or doc.id.lower() == email.lower():
+            if (
+                data.get("contactEmail", "").lower() == clean_email or 
+                data.get("details", {}).get("contactEmail", "").lower() == clean_email or 
+                data.get("email", "").lower() == clean_email or
+                doc.id.lower() == clean_email
+            ):
                 vendor_data = data
+                vendor_id_found = doc.id
                 db_fs.collection("vendors").document(doc.id).delete()
                 
         # Delete from "vendor_queue"
-        doc_q = db_fs.collection("vendor_queue").document(email.lower())
+        doc_q = db_fs.collection("vendor_queue").document(clean_email)
         if doc_q.get().exists:
             if not vendor_data:
                 vendor_data = doc_q.get().to_dict()
@@ -894,27 +902,111 @@ def unlock_vendor(email: str, request: Request):
                     "website": vendor_data.get("website", "") or vendor_data.get("businessInfo", {}).get("website", ""),
                     "country": vendor_data.get("country", "") or vendor_data.get("businessInfo", {}).get("country", ""),
                     "industry": vendor_data.get("industry", "") or vendor_data.get("businessInfo", {}).get("industry", ""),
-                    "contactEmail": vendor_data.get("contactEmail", "") or v_details.get("contactEmail", "") or vendor_data.get("businessInfo", {}).get("contactEmail", "")
+                    "contactEmail": vendor_data.get("contactEmail", "") or v_details.get("contactEmail", "") or clean_email
                 },
                 "financials": vendor_data.get("financials", {}) or v_details.get("financials", {}),
                 "signature": vendor_data.get("signature", "")
             }
-            db_fs.collection("onboarding_drafts").document(email.lower()).set(draft_data)
+            db_fs.collection("onboarding_drafts").document(clean_email).set(draft_data)
+
+        # Clear any active monitoring alerts for this vendor
+        if vendor_id_found:
+            try:
+                for alert_doc in db_fs.collection("monitoring_alerts").where("vendorId", "==", vendor_id_found).stream():
+                    db_fs.collection("monitoring_alerts").document(alert_doc.id).delete()
+            except Exception:
+                pass
 
         client_ip = get_client_ip(request)
-        cname = (vendor_data.get("companyName") if vendor_data else "") or email
+        cname = (vendor_data.get("companyName") if vendor_data else "") or clean_email
         log_user_activity(
-            user_email=email.lower(),
+            user_email=clean_email,
             user_name=cname,
-            user_role="Vendor",
+            user_role="Compliance Officer",
             action="VENDOR_UNLOCKED",
             target=cname,
-            details=f"Vendor packet unlocked for re-editing and resubmission.",
+            details=f"Vendor packet for '{cname}' unlocked for re-editing and resubmission.",
             ip_address=client_ip,
             status="SUCCESS"
         )
             
-        return {"status": "success"}
+        return {"status": "success", "message": f"Vendor {clean_email} unlocked successfully."}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/vendors/{vendor_id}/unlock")
+def unlock_vendor_by_id(vendor_id: str, request: Request):
+    try:
+        # If vendor_id is an email string, route directly to unlock_vendor
+        if "@" in vendor_id:
+            return unlock_vendor(vendor_id, request)
+
+        doc_ref = db_fs.collection("vendors").document(vendor_id)
+        doc = doc_ref.get()
+        vendor_data = None
+        if doc.exists:
+            vendor_data = doc.to_dict()
+            doc_ref.delete()
+        else:
+            # Fallback search across vendors
+            for vdoc in db_fs.collection("vendors").stream():
+                vdata = vdoc.to_dict()
+                if vdoc.id == vendor_id or vdata.get("id") == vendor_id:
+                    vendor_data = vdata
+                    db_fs.collection("vendors").document(vdoc.id).delete()
+                    break
+
+        # Check for associated contact email
+        contact_email = None
+        if vendor_data:
+            contact_email = (
+                vendor_data.get("contactEmail") or 
+                vendor_data.get("details", {}).get("contactEmail") or 
+                vendor_data.get("email")
+            )
+            if contact_email:
+                contact_email = contact_email.strip().lower()
+
+        # If contact email is found, also restore draft for vendor portal
+        if contact_email:
+            doc_q = db_fs.collection("vendor_queue").document(contact_email)
+            if doc_q.get().exists:
+                doc_q.delete()
+
+            v_details = vendor_data.get("details", {})
+            draft_data = {
+                "businessInfo": {
+                    "legalName": vendor_data.get("companyName", "") or vendor_data.get("businessInfo", {}).get("legalName", ""),
+                    "website": vendor_data.get("website", "") or vendor_data.get("businessInfo", {}).get("website", ""),
+                    "country": vendor_data.get("country", "") or vendor_data.get("businessInfo", {}).get("country", ""),
+                    "industry": vendor_data.get("industry", "") or vendor_data.get("businessInfo", {}).get("industry", ""),
+                    "contactEmail": contact_email
+                },
+                "financials": vendor_data.get("financials", {}) or v_details.get("financials", {}),
+                "signature": vendor_data.get("signature", "")
+            }
+            db_fs.collection("onboarding_drafts").document(contact_email).set(draft_data)
+
+        # Clear any active monitoring alerts for this vendor ID
+        try:
+            for alert_doc in db_fs.collection("monitoring_alerts").where("vendorId", "==", vendor_id).stream():
+                db_fs.collection("monitoring_alerts").document(alert_doc.id).delete()
+        except Exception:
+            pass
+
+        client_ip = get_client_ip(request)
+        cname = (vendor_data.get("companyName") if vendor_data else "") or vendor_id
+        log_user_activity(
+            user_email=contact_email or "compliance@10xds.com",
+            user_name=cname,
+            user_role="Compliance Officer",
+            action="VENDOR_UNLOCKED",
+            target=cname,
+            details=f"Vendor '{cname}' (ID: {vendor_id}) unlocked and removed from active registry.",
+            ip_address=client_ip,
+            status="SUCCESS"
+        )
+        return {"status": "success", "message": f"Vendor {vendor_id} unlocked successfully."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
