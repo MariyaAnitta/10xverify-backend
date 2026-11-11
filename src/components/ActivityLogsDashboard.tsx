@@ -59,7 +59,13 @@ export default function ActivityLogsDashboard() {
     } else if (selectedFilter === "SCREENINGS") {
       if (log.action !== "VENDOR_SCREENED") return false;
     } else if (selectedFilter === "SANCTIONS") {
-      if (log.action !== "SANCTIONS_QUICK_CHECK") return false;
+      const isSanctions = 
+        log.action.includes("SANCTION") || 
+        log.action.includes("BLACKLIST") ||
+        (log.details && log.details.toLowerCase().includes("sanction")) ||
+        (log.details && log.details.toLowerCase().includes("ofac")) ||
+        (log.details && log.details.toLowerCase().includes("sdn"));
+      if (!isSanctions) return false;
     }
 
     // Search query filter
@@ -136,6 +142,13 @@ export default function ActivityLogsDashboard() {
           icon: SearchCode,
           color: "bg-purple-50 text-purple-700 border-purple-200",
           label: "Sanctions Check"
+        };
+      case "SANCTIONS_BLOCK_DETECTED":
+      case "SANCTIONS_BLOCKED":
+        return {
+          icon: ShieldAlert,
+          color: "bg-red-50 text-red-700 border-red-200 animate-pulse",
+          label: "Sanctions Block"
         };
       case "COMMENT_ADDED":
         return {

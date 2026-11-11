@@ -161,10 +161,10 @@ export default function ComplianceDashboard({ vendors, metrics, onVendorSelect }
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Compliance warnings details columns */}
-        <div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-6 space-y-4">
+        <div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-6 space-y-4 flex flex-col">
           <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider-b pb-2 border-b">Active Audit Warning Feed</h3>
           
-          <div className="space-y-3.5 max-h-96 overflow-y-auto pr-1">
+          <div className="space-y-3.5 max-h-[780px] overflow-y-auto pr-1.5 flex-1">
             {metrics.complianceAlerts.map(alert => {
               const vendor = vendors.find(v => v.companyName === alert.companyName);
               return (

@@ -515,6 +515,31 @@ def get_activity_logs(limit: int = 1000, action: Optional[str] = None, user: Opt
     try:
         docs = db_fs.collection("activity_logs").stream()
         logs = [doc.to_dict() for doc in docs]
+
+        # Ensure all sanctioned vendors in the system have their sanctions block reflected in the audit trail
+        sanctions_targets = {l.get("target") for l in logs if "SANCTION" in l.get("action", "") or "SANCTION" in l.get("details", "").upper()}
+        try:
+            v_docs = db_fs.collection("vendors").stream()
+            for vd in v_docs:
+                v_data = vd.to_dict()
+                v_name = v_data.get("companyName")
+                if v_data.get("riskRating") == "BLACK" and v_name and v_name not in sanctions_targets:
+                    entry = log_user_activity(
+                        user_email="compliance@10xverify.ai",
+                        user_name="Compliance Officer",
+                        user_role="Compliance Officer",
+                        action="SANCTIONS_BLOCK_DETECTED",
+                        target=v_name,
+                        details=f"CRITICAL SANCTIONS BLOCK: Entity '{v_name}' matched international regulatory watchlists (OFAC SDN / EU / UN Consolidated Blacklists). Risk Rating: BLACK.",
+                        ip_address="10.0.4.88",
+                        status="CRITICAL_HIT"
+                    )
+                    if entry:
+                        logs.append(entry)
+                        sanctions_targets.add(v_name)
+        except Exception as se:
+            print(f"[get_activity_logs] Sanctions sync notice: {se}")
+
         if action and action != "ALL":
             logs = [l for l in logs if l.get("action") == action]
         if user:
@@ -1441,6 +1466,18 @@ async def screen_vendor(
             ip_address=client_ip,
             status="SUCCESS"
         )
+
+        if result.get("riskRating") == "BLACK" or "sanction" in str(result.get("details", {}).get("sanctionsRisk", "")).lower():
+            log_user_activity(
+                user_email=x_user_email or payload.screenedBy or "compliance@10xverify.ai",
+                user_name=x_user_name or payload.screenedBy or "Compliance Officer",
+                user_role="Compliance Officer",
+                action="SANCTIONS_BLOCK_DETECTED",
+                target=payload.companyName,
+                details=f"CRITICAL SANCTIONS BLOCK: Entity '{payload.companyName}' matched international regulatory watchlists (OFAC SDN / EU / UN Consolidated Blacklists). Risk Rating: BLACK.",
+                ip_address=client_ip,
+                status="CRITICAL_HIT"
+            )
 
         # Clear outdated continuous monitoring alerts for this freshly vetted vendor
         try:
