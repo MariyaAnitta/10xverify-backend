@@ -12,7 +12,7 @@ interface VendorDetailDossierProps {
 }
 
 export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDeleteVendor, currentUser, monitoringAlerts = [] }: VendorDetailDossierProps) {
-  const [expandedAgent, setExpandedAgent] = useState<string | null>("risk-intelligence-agent");
+  const [expandedAgent, setExpandedAgent] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
   const [pdfMode, setPdfMode] = useState(false);
   const [dismissedAlerts, setDismissedAlerts] = useState<string[]>([]);
@@ -246,7 +246,7 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
             </div>
 
             <div className={`text-center font-bold px-4 py-2 ${getRiskBadgeClass(vendor.riskRating)} rounded-xl text-xs uppercase tracking-wider shadow`}>
-              {vendor.riskRating === "GREEN" ? "LOW RISK" : vendor.riskRating === "AMBER" ? "MEDIUM RISK" : vendor.riskRating === "RED" ? "HIGH RISK" : "SANCTIONS BLOCKED"}
+              {vendor.riskRating === "GREEN" ? "Green – Low Risk" : vendor.riskRating === "AMBER" ? "Amber – Moderate Risk" : vendor.riskRating === "RED" ? "Red – High Risk" : "Black – Blocked"}
             </div>
           </div>
         </div>

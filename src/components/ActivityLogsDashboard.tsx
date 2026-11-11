@@ -32,7 +32,7 @@ export default function ActivityLogsDashboard() {
   const fetchLogs = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/activity-logs");
+      const res = await fetch("/api/activity-logs?limit=1000");
       if (res.ok) {
         const data = await res.json();
         setLogs(data || []);
@@ -172,14 +172,17 @@ export default function ActivityLogsDashboard() {
   };
 
   const exportCSV = () => {
-    if (filteredLogs.length === 0) return;
+    // Export all available audit records in the compliance ledger
+    const recordsToExport = logs.length > 0 ? logs : filteredLogs;
+    if (recordsToExport.length === 0) return;
+
     const headers = ["Timestamp", "Date", "Time", "User Email", "User Name", "User Role", "Action", "Target", "Details", "IP Address", "Status"];
-    const rows = filteredLogs.map(l => [
+    const rows = recordsToExport.map(l => [
       `"${l.timestamp || ""}"`,
       `"${l.date || ""}"`,
       `"${l.time || ""}"`,
       `"${l.userEmail || ""}"`,
-      `"${l.userName || ""}"`,
+      `"${(l.userName || "").replace(/"/g, '""')}"`,
       `"${l.userRole || ""}"`,
       `"${l.action || ""}"`,
       `"${(l.target || "").replace(/"/g, '""')}"`,
@@ -187,14 +190,18 @@ export default function ActivityLogsDashboard() {
       `"${l.ipAddress || ""}"`,
       `"${l.status || ""}"`
     ]);
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
+
+    // Use Blob and URL.createObjectURL to ensure all 300+ records are exported without browser URI truncation
+    const csvContent = "\uFEFF" + [headers.join(","), ...rows.map(r => r.join(","))].join("\r\n");
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
+    link.setAttribute("href", url);
     link.setAttribute("download", `10xVerify_Audit_Trail_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   // Summary Metrics

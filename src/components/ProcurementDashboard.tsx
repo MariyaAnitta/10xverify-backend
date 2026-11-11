@@ -43,6 +43,31 @@ export default function ProcurementDashboard({ vendors, onVendorSelect, onStatus
     }
   };
 
+  const getRiskBadgeStyle = (rating: RiskRating) => {
+    switch (rating) {
+      case RiskRating.GREEN:
+        return "bg-emerald-50 text-emerald-700 border border-emerald-100";
+      case RiskRating.AMBER:
+        return "bg-amber-50 text-amber-700 border border-amber-200";
+      case RiskRating.RED:
+        return "bg-red-50 text-red-700 border border-red-100";
+      case RiskRating.BLACK:
+        return "bg-slate-100 text-slate-800 border border-slate-200";
+      default:
+        return "bg-slate-50 text-slate-700 border border-slate-150";
+    }
+  };
+
+  const getRiskClassification = (rating: RiskRating) => {
+    switch (rating) {
+      case RiskRating.GREEN: return "Green – Low Risk";
+      case RiskRating.AMBER: return "Amber – Moderate Risk";
+      case RiskRating.RED: return "Red – High Risk";
+      case RiskRating.BLACK: return "Black – Blocked";
+      default: return rating;
+    }
+  };
+
   return (
     <div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-6" id="procurement-dashboard">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-50 pb-4 mb-6 gap-4">
@@ -209,12 +234,8 @@ export default function ProcurementDashboard({ vendors, onVendorSelect, onStatus
                     <div className="text-xxs text-slate-400 font-bold uppercase">Weighted Integrity</div>
                     <div className="font-semibold text-slate-800">{vendor.riskScore}% Profile</div>
                   </div>
-                  <div className={`px-2 py-1 text-center font-bold tracking-wider rounded text-[10px] uppercase ${
-                    vendor.riskRating === RiskRating.GREEN 
-                      ? "bg-emerald-50 text-emerald-700 border border-emerald-100" 
-                      : "bg-red-50 text-red-700 border border-red-100"
-                  }`}>
-                    {vendor.riskRating}
+                  <div className={`px-2.5 py-1 text-center font-bold tracking-wider rounded text-[10px] uppercase whitespace-nowrap ${getRiskBadgeStyle(vendor.riskRating)}`}>
+                    {getRiskClassification(vendor.riskRating)}
                   </div>
                 </div>
               </div>

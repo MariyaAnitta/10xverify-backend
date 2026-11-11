@@ -371,34 +371,20 @@ def login_user(req: LoginRequest, request: Request):
             frontend_role = "Vendor"
 
         if not doc.exists:
-            # Auto-provision testing users on the fly so testers are never locked out
-            clean_name = req.email.split("@")[0].replace(".", " ").replace("_", " ").title()
-            user_data = {
-                "email": req.email.lower(),
-                "password": req.password,
-                "name": clean_name or "Authorized Officer",
-                "role": db_role,
-                "createdAt": firestore.SERVER_TIMESTAMP
-            }
-            user_ref.set(user_data)
             log_user_activity(
                 user_email=req.email.lower(),
-                user_name=user_data["name"],
+                user_name="Unregistered User",
                 user_role=frontend_role,
-                action="USER_LOGIN_AUTOPROVISION",
-                target="Platform Workspace",
-                details=f"New workspace session created and signed in as '{frontend_role}'.",
+                action="USER_LOGIN_FAILED",
+                target="Vendor Portal Gateway",
+                details=f"Sign-in rejected: '{req.email.lower()}' is not registered. Prior registration is required.",
                 ip_address=client_ip,
-                status="SUCCESS"
+                status="FAILED"
             )
-            return {
-                "status": "success", 
-                "user": {
-                    "email": req.email.lower(), 
-                    "name": user_data["name"], 
-                    "role": frontend_role
-                }
-            }
+            raise HTTPException(
+                status_code=401, 
+                detail="Account not found. Only registered and authorized vendors are allowed to sign in. Please register first."
+            )
         
         user = doc.to_dict()
         if user.get("password") and user.get("password") != req.password:
@@ -525,7 +511,7 @@ def delete_user(email: str, request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/activity-logs")
-def get_activity_logs(limit: int = 300, action: Optional[str] = None, user: Optional[str] = None):
+def get_activity_logs(limit: int = 1000, action: Optional[str] = None, user: Optional[str] = None):
     try:
         docs = db_fs.collection("activity_logs").stream()
         logs = [doc.to_dict() for doc in docs]
