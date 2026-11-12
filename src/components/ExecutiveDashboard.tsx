@@ -293,21 +293,25 @@ export default function ExecutiveDashboard({ vendors, metrics, onVendorSelect, o
                 <div
                   key={vendor.id}
                   onClick={() => onVendorSelect(vendor)}
-                  className={`p-4 bg-white hover:bg-slate-50/70 border border-slate-100 rounded-xl shadow-xxs transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 group ${getRiskBorder(vendor.riskRating)}`}
+                  className={`p-4 bg-white hover:bg-slate-50/70 border border-slate-100 rounded-xl shadow-xxs transition-all cursor-pointer flex flex-col md:flex-row md:items-center justify-between gap-4 group overflow-hidden ${getRiskBorder(vendor.riskRating)}`}
                 >
-                  <div className="space-y-1 max-w-md">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h4 className="font-semibold text-slate-900 text-sm tracking-tight group-hover:text-blue-600 transition-colors">{vendor.companyName}</h4>
-                      <span className="text-xxs font-bold uppercase tracking-wider text-slate-400 px-1.5 py-0.5 bg-slate-50 border border-slate-100 rounded">
+                  <div className="space-y-1 flex-1 min-w-0 max-w-full">
+                    <div className="flex items-center gap-2 flex-wrap min-w-0">
+                      <h4 className="font-semibold text-slate-900 text-sm tracking-tight group-hover:text-blue-600 transition-colors break-all line-clamp-1" title={vendor.companyName}>
+                        {vendor.companyName}
+                      </h4>
+                      <span className="text-xxs font-bold uppercase tracking-wider text-slate-400 px-1.5 py-0.5 bg-slate-50 border border-slate-100 rounded shrink-0">
                         {vendor.industry}
                       </span>
                     </div>
-                    <div className="text-xxs text-slate-500 flex items-center gap-3">
-                      <span>Website: <span className="font-medium text-blue-600 underline">{vendor.website}</span></span>
-                      <span>Country: <span className="font-semibold">{vendor.country}</span></span>
-                      <span>Vetted: <b>{new Date(vendor.screenedAt).toLocaleDateString()}</b></span>
+                    <div className="text-xxs text-slate-500 flex items-center gap-3 flex-wrap min-w-0">
+                      <span className="truncate max-w-[220px]" title={vendor.website}>
+                        Website: <span className="font-medium text-blue-600 underline break-all">{vendor.website}</span>
+                      </span>
+                      <span className="shrink-0">Country: <span className="font-semibold">{vendor.country}</span></span>
+                      <span className="shrink-0">Vetted: <b>{new Date(vendor.screenedAt).toLocaleDateString()}</b></span>
                     </div>
-                    <p className="text-xs text-slate-500 line-clamp-1">{vendor.executiveSummary}</p>
+                    <p className="text-xs text-slate-500 line-clamp-1 break-words">{vendor.executiveSummary}</p>
                   </div>
 
                   <div className="flex flex-col items-end justify-center gap-2 shrink-0 border-t md:border-0 pt-3 md:pt-0 border-slate-100">

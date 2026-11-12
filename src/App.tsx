@@ -499,6 +499,11 @@ export default function App() {
                   <ScreeningPortal
                     onScreeningComplete={handleNewScreeningComplete}
                     autoStartVendor={autoStartVendor}
+                    existingVendors={vendors}
+                    onViewExistingVendor={(vendorId) => {
+                      setSelectedVendorId(vendorId);
+                      setActiveTab("executive");
+                    }}
                   />
                 )}
 

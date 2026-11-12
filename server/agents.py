@@ -1228,10 +1228,31 @@ async def execute_adk_verification(
 
     # 2. Location Agent Override
     location_score = loc_obj.get("score", 0)
-    location_finding = loc_obj.get("findings", "").lower()
-    negative_keywords = ["mismatch", "residential", "virtual", "unrelated", "wrong address"]
-    if not any(kw in location_finding for kw in negative_keywords):
+    all_location_text = (
+        str(loc_obj.get("findings", "")) + " " +
+        str(loc_obj.get("validatedAddress", "")) + " " +
+        " ".join(str(e) for e in loc_obj.get("evidenceRecords", [])) + " " +
+        " ".join(str(c) for c in loc_obj.get("coreAuditFindings", []))
+    ).lower()
+
+    failure_keywords = [
+        "mismatch", "residential", "virtual", "unrelated", "wrong address",
+        "fail", "invalid", "unable to verify", "impossible", "unreliable",
+        "unverified", "malicious", "xss", "cannot be verified", "not verified"
+    ]
+    has_location_failures = any(kw in all_location_text for kw in failure_keywords)
+    corp_verified = corp_obj.get("score", 0) >= 60
+
+    # If verification failed, address is unverified, or input was invalid/malicious,
+    # preserve the actual failed score (do NOT floor to 65).
+    # If all checks failed or status is critical, score should accurately reflect 0%.
+    if has_location_failures or not corp_verified or loc_obj.get("status") in ["critical", "danger"] or location_score == 0:
+        if loc_obj.get("status") == "critical" or "impossible" in all_location_text or "invalid" in all_location_text:
+            location_score = min(location_score, 0 if ("impossible" in all_location_text or "invalid" in all_location_text) else location_score)
+    else:
+        # Only apply safety floor if corporate entity is verified and location checks passed with no flags
         location_score = max(location_score, 65)
+
     loc_obj["score"] = location_score
 
     # 3. Regulatory Agent Override

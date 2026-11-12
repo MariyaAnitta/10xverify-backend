@@ -1,12 +1,32 @@
 import React, { useState, useEffect } from "react";
-import { Play, CheckCircle, Shield, AlertTriangle, Cpu, Globe, Search, Navigation, Award, MessageSquare, DollarSign } from "lucide-react";
+import { Play, CheckCircle, Shield, AlertTriangle, Cpu, Globe, Search, Navigation, Award, MessageSquare, DollarSign, RefreshCw, X } from "lucide-react";
 import { VendorScreening } from "../types";
 import { motion, AnimatePresence } from "motion/react";
 
 interface ScreeningPortalProps {
   onScreeningComplete: (newVendor: VendorScreening) => void;
   autoStartVendor?: any;
+  existingVendors?: VendorScreening[];
+  onViewExistingVendor?: (vendorId: string) => void;
 }
+
+const isValidDomainOrUrl = (value: string): boolean => {
+  if (!value || typeof value !== "string") return false;
+  const raw = value.trim();
+  let host = raw;
+  if (/^https?:\/\//i.test(host)) {
+    try {
+      const parsed = new URL(raw);
+      host = parsed.hostname;
+    } catch {
+      return false;
+    }
+  } else {
+    host = host.split("/")[0].split("?")[0].split("#")[0];
+  }
+  const domainPattern = /^(?!-)[a-zA-Z0-9-]{1,63}(?<!-)(\.[a-zA-Z0-9-]{1,63}(?<!-))*\.[a-zA-Z]{2,}$/;
+  return domainPattern.test(host);
+};
 
 const STAGES = [
   { id: "corporate", name: "Company Verification Agent", icon: Shield, log: "Connecting to company registry..." },
@@ -18,13 +38,14 @@ const STAGES = [
   { id: "risk", name: "Risk Intelligence Agent", icon: Cpu, log: "Consolidating risk intelligence..." }
 ];
 
-export default function ScreeningPortal({ onScreeningComplete, autoStartVendor }: ScreeningPortalProps) {
+export default function ScreeningPortal({ onScreeningComplete, autoStartVendor, existingVendors, onViewExistingVendor }: ScreeningPortalProps) {
   const [companyName, setCompanyName] = useState("");
   const [website, setWebsite] = useState("");
   const [country, setCountry] = useState("United States");
   const [customCountry, setCustomCountry] = useState("");
   const [industry, setIndustry] = useState("Healthcare");
   const [customIndustry, setCustomIndustry] = useState("");
+  const [duplicateMatch, setDuplicateMatch] = useState<VendorScreening | null>(null);
   const [screenedBy, setScreenedBy] = useState(() => {
     try {
       const u = JSON.parse(localStorage.getItem("10xverify_user") || "{}");
@@ -56,6 +77,16 @@ export default function ScreeningPortal({ onScreeningComplete, autoStartVendor }
     "Manufacturing", "Investment Firms", "Technology",
     "Other (Write-in)"
   ];
+
+  useEffect(() => {
+    if (duplicateMatch) {
+      const orig = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      return () => {
+        document.body.style.overflow = orig;
+      };
+    }
+  }, [duplicateMatch]);
 
   // Auto-start if triggered from Vendor Queue
   useEffect(() => {
@@ -168,12 +199,29 @@ export default function ScreeningPortal({ onScreeningComplete, autoStartVendor }
     return () => clearInterval(logGenerator);
   }, [isRunning, currentStageIndex]);
 
+  const startScreeningSequence = () => {
+    setErrorMessage("");
+    setIsRunning(true);
+    setIsFinalizing(false);
+    setCurrentStageIndex(0);
+    setTickerLogs([`[SYSTEM] Digital workforce initiated for ${companyName}.`]);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!companyName.trim() || !website.trim()) {
-      setErrorMessage("Please supply a valid Company Name and Domain/Website address.");
+    if (!companyName.trim()) {
+      setErrorMessage("Please supply a valid Company Name.");
       return;
     }
+    if (!website.trim()) {
+      setErrorMessage("Please supply a Company Website/Domain address.");
+      return;
+    }
+    if (!isValidDomainOrUrl(website)) {
+      setErrorMessage("Invalid website/domain format. Please enter a valid domain (e.g. 'company.com' or 'https://company.com') with a valid extension.");
+      return;
+    }
+
     const finalCountry = country === "Other (Write-in)" ? customCountry.trim() : country;
     const finalIndustry = industry === "Other (Write-in)" ? customIndustry.trim() : industry;
 
@@ -186,11 +234,23 @@ export default function ScreeningPortal({ onScreeningComplete, autoStartVendor }
       return;
     }
 
-    setErrorMessage("");
-    setIsRunning(true);
-    setIsFinalizing(false);
-    setCurrentStageIndex(0);
-    setTickerLogs([`[SYSTEM] Digital workforce initiated for ${companyName}.`]);
+    // Check for existing records to prevent unintended duplicate screenings
+    if (existingVendors && existingVendors.length > 0) {
+      const cleanName = companyName.trim().toLowerCase();
+      const cleanSite = website.replace(/^https?:\/\//i, "").replace(/^www\./i, "").split("/")[0].toLowerCase().trim();
+      const match = existingVendors.find(v => {
+        const vName = (v.companyName || "").trim().toLowerCase();
+        const vSite = (v.website || "").replace(/^https?:\/\//i, "").replace(/^www\./i, "").split("/")[0].toLowerCase().trim();
+        return (cleanName && vName === cleanName) || (cleanSite && vSite && vSite === cleanSite);
+      });
+
+      if (match) {
+        setDuplicateMatch(match);
+        return;
+      }
+    }
+
+    startScreeningSequence();
   };
 
   const completeScreening = async () => {
@@ -471,6 +531,100 @@ export default function ScreeningPortal({ onScreeningComplete, autoStartVendor }
 
             <div className="pt-2 text-center text-xs text-slate-400">
               Cross-referencing global corporate registries, trade watchlists, cybersecurity feeds, and public filings.
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Duplicate Record Detection Modal */}
+      {duplicateMatch && (
+        <div 
+          onClick={() => setDuplicateMatch(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 space-y-4 relative"
+          >
+            <button
+              onClick={() => setDuplicateMatch(null)}
+              className="absolute right-4 top-4 p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 text-amber-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Existing Company Record Detected</h3>
+                <p className="text-xs text-slate-500">A screening dossier for this entity already exists in the system.</p>
+              </div>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-xl border border-slate-200 space-y-2 text-xs">
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-medium">Company Name:</span>
+                <span className="font-bold text-slate-900 break-all">{duplicateMatch.companyName}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-medium">Registered Domain:</span>
+                <span className="font-mono text-blue-600 break-all">{duplicateMatch.website}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-medium">Vetting Score / Status:</span>
+                <span className="font-bold text-slate-900">{duplicateMatch.riskScore}% ({duplicateMatch.riskRating})</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-medium">Screening Date:</span>
+                <span className="text-slate-700">{new Date(duplicateMatch.screenedAt).toLocaleDateString()}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500 font-medium">Dossier ID:</span>
+                <span className="font-mono text-slate-600">{duplicateMatch.id}</span>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              To prevent duplicate records, you can review the existing audit dossier or proceed to perform a fresh re-audit that updates this entity's record in the registry.
+            </p>
+
+            <div className="flex flex-col sm:flex-row items-center justify-end gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setDuplicateMatch(null)}
+                className="w-full sm:w-auto px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+
+              {onViewExistingVendor && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const id = duplicateMatch.id;
+                    setDuplicateMatch(null);
+                    onViewExistingVendor(id);
+                  }}
+                  className="w-full sm:w-auto px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer shadow-sm flex items-center justify-center gap-1.5"
+                >
+                  <Shield className="w-3.5 h-3.5 text-blue-400" />
+                  <span>Review Existing Dossier</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => {
+                  setDuplicateMatch(null);
+                  startScreeningSequence();
+                }}
+                className="w-full sm:w-auto px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-colors cursor-pointer shadow-sm flex items-center justify-center gap-1.5"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Re-Audit & Update Record</span>
+              </button>
             </div>
           </div>
         </div>

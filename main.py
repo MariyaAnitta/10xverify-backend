@@ -1434,6 +1434,14 @@ async def screen_vendor(
     x_user_name: Optional[str] = Header(None, alias="X-User-Name")
 ):
     clean_website = payload.website.replace("https://", "").replace("http://", "").replace("www.", "").strip().rstrip("/")
+    domain_to_check = clean_website.split("/")[0].split("?")[0].split("#")[0]
+    domain_regex = re.compile(r"^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$")
+    if not domain_regex.match(domain_to_check):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid website/domain format '{payload.website}'. Please provide a valid domain (e.g. 'company.com' or 'https://company.com')."
+        )
+
     try:
         # Check if email is in the queue and delete it
         if payload.email:
@@ -1452,7 +1460,21 @@ async def screen_vendor(
         if payload.email:
             result["contactEmail"] = payload.email.lower()
             
-        vendor_id = result.get("id")
+        # Check for existing vendor matching company name or website to prevent duplicate document creation
+        existing_id = None
+        try:
+            for doc in db_fs.collection("vendors").stream():
+                data = doc.to_dict()
+                doc_name = (data.get("companyName") or "").strip().lower()
+                doc_site = (data.get("website") or "").replace("https://", "").replace("http://", "").replace("www.", "").strip().lower().rstrip("/")
+                if doc_name == payload.companyName.strip().lower() or (clean_website and doc_site == clean_website.lower()):
+                    existing_id = doc.id
+                    break
+        except Exception as ex:
+            print(f"[Duplicate Check Error] {ex}")
+
+        vendor_id = existing_id if existing_id else result.get("id")
+        result["id"] = vendor_id
         db_fs.collection("vendors").document(vendor_id).set(result)
 
         client_ip = get_client_ip(request)

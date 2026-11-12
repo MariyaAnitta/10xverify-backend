@@ -92,12 +92,12 @@ export default function EvidenceRepository() {
           <table className="w-full text-left text-xxs border-collapse">
             <thead>
               <tr className="bg-slate-50/70 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                <th className="p-3">Timestamp</th>
-                <th className="p-3">Vetted Vendor</th>
-                <th className="p-3">API Source / Method</th>
-                <th className="p-3">Query Param / Target</th>
-                <th className="p-3 text-center">Status</th>
-                <th className="p-3 text-center">Actions</th>
+                <th className="p-3 whitespace-nowrap">Timestamp</th>
+                <th className="p-3 max-w-[200px] whitespace-nowrap">Vetted Vendor</th>
+                <th className="p-3 whitespace-nowrap">API Source / Method</th>
+                <th className="p-3 max-w-xs whitespace-nowrap">Query Param / Target</th>
+                <th className="p-3 text-center whitespace-nowrap">Status</th>
+                <th className="p-3 text-center whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 text-slate-700 font-medium">
@@ -119,21 +119,21 @@ export default function EvidenceRepository() {
               ) : (
                 filteredLogs.map((log, i) => (
                   <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="p-3 font-mono text-slate-400">{new Date(log.timestamp).toLocaleString()}</td>
-                    <td className="p-3 font-bold text-slate-800">{log.companyName}</td>
-                    <td className="p-3 font-semibold text-slate-700">{log.apiSource}</td>
+                    <td className="p-3 font-mono text-slate-400 whitespace-nowrap">{new Date(log.timestamp).toLocaleString()}</td>
+                    <td className="p-3 font-bold text-slate-800 max-w-[200px] truncate break-all" title={log.companyName}>{log.companyName}</td>
+                    <td className="p-3 font-semibold text-slate-700 whitespace-nowrap">{log.apiSource}</td>
                     <td className="p-3 font-mono max-w-xs truncate text-slate-650" title={log.query}>{log.query}</td>
-                    <td className="p-3 text-center">
+                    <td className="p-3 text-center whitespace-nowrap">
                       <span className={`px-2 py-0.5 rounded font-bold uppercase ${
                         log.status === "200 OK" ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-600"
                       }`}>
                         {log.status}
                       </span>
                     </td>
-                    <td className="p-3 text-center">
+                    <td className="p-3 text-center whitespace-nowrap">
                       <button
                         onClick={() => setSelectedLog(log)}
-                        className="p-1 px-2.5 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-lg text-slate-600 hover:text-indigo-600 transition-colors inline-flex items-center gap-1 font-bold"
+                        className="p-1 px-2.5 bg-slate-50 hover:bg-indigo-50 border border-slate-200 hover:border-indigo-200 rounded-lg text-slate-600 hover:text-indigo-600 transition-colors inline-flex items-center gap-1 font-bold whitespace-nowrap"
                       >
                         <Eye className="w-3 h-3" />
                         <span>Inspect Payload</span>

@@ -224,18 +224,18 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
   })()}
 
       {/* Main header block */}
-      <div className={`p-6 md:p-8 border border-slate-100 rounded-2xl ${getRiskBorder(vendor.riskRating)} space-y-6`}>
+      <div className={`p-6 md:p-8 border border-slate-100 rounded-2xl ${getRiskBorder(vendor.riskRating)} space-y-6 overflow-hidden`}>
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-6">
-          <div className="space-y-2">
-            <div className="space-y-1">
+          <div className="space-y-2 flex-1 min-w-0">
+            <div className="space-y-1 min-w-0">
               <span className="text-xxs uppercase tracking-widest font-bold text-slate-400">Board Vetting Dossier</span>
-              <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight">{vendor.companyName}</h1>
+              <h1 className="text-2xl md:text-3xl font-bold text-slate-900 tracking-tight break-all">{vendor.companyName}</h1>
             </div>
 
-            <div className="flex flex-wrap gap-x-4 gap-y-2 text-xxs text-slate-500 font-medium">
-              <span className="flex items-center gap-1"><Globe className="w-3.5 h-3.5 text-blue-500" /> {vendor.website}</span>
-              <span className="flex items-center gap-1"><MapPin className="w-3.5 h-3.5 text-red-500" /> {vendor.country}</span>
-              <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5 text-purple-500" /> Screened: {new Date(vendor.screenedAt).toLocaleDateString()}</span>
+            <div className="flex flex-wrap gap-x-4 gap-y-2 text-xxs text-slate-500 font-medium min-w-0">
+              <span className="flex items-center gap-1 min-w-0 max-w-full"><Globe className="w-3.5 h-3.5 text-blue-500 shrink-0" /> <span className="break-all">{vendor.website}</span></span>
+              <span className="flex items-center gap-1 shrink-0"><MapPin className="w-3.5 h-3.5 text-red-500 shrink-0" /> {vendor.country}</span>
+              <span className="flex items-center gap-1 shrink-0"><Calendar className="w-3.5 h-3.5 text-purple-500 shrink-0" /> Screened: {new Date(vendor.screenedAt).toLocaleDateString()}</span>
             </div>
           </div>
 

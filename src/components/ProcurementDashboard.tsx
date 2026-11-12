@@ -172,17 +172,17 @@ export default function ProcurementDashboard({ vendors, onVendorSelect, onStatus
               filteredPending.map(vendor => (
                 <div
                   key={vendor.id}
-                  className="bg-white border border-slate-100 rounded-xl p-5 hover:shadow-xxs transition-all flex flex-col md:flex-row items-stretch justify-between gap-6"
+                  className="bg-white border border-slate-100 rounded-xl p-5 hover:shadow-xxs transition-all flex flex-col md:flex-row items-stretch justify-between gap-6 overflow-hidden"
                 >
-                  <div className="space-y-3 flex-1">
-                    <div className="flex items-start justify-between">
+                  <div className="space-y-3 flex-1 min-w-0">
+                    <div className="flex items-start justify-between min-w-0 gap-4">
                       <div
                         onClick={() => onVendorSelect(vendor)}
-                        className="cursor-pointer group space-y-1"
+                        className="cursor-pointer group space-y-1 flex-1 min-w-0"
                       >
-                        <h4 className="font-bold text-slate-900 text-sm group-hover:text-blue-600 transition-colors flex items-center gap-1.5">
-                          {vendor.companyName}
-                          <ArrowRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-blue-500" />
+                        <h4 className="font-bold text-slate-900 text-sm group-hover:text-blue-600 transition-colors flex items-center gap-1.5 break-all line-clamp-1" title={vendor.companyName}>
+                          <span>{vendor.companyName}</span>
+                          <ArrowRight className="w-3.5 h-3.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-blue-500" />
                         </h4>
                         <div className="text-xxs text-slate-500 flex items-center gap-3 flex-wrap">
                           <span className="font-medium text-slate-400 uppercase">{vendor.industry}</span>
@@ -191,7 +191,7 @@ export default function ProcurementDashboard({ vendors, onVendorSelect, onStatus
                         </div>
                       </div>
 
-                      <div className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 ${getRiskLabel(vendor.riskRating)}`}>
+                      <div className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5 shrink-0 ${getRiskLabel(vendor.riskRating)}`}>
                         {getRiskIcon(vendor.riskRating)}
                         <span>Score: {vendor.riskScore}%</span>
                       </div>
@@ -277,17 +277,17 @@ export default function ProcurementDashboard({ vendors, onVendorSelect, onStatus
               <div
                 key={vendor.id}
                 onClick={() => onVendorSelect(vendor)}
-                className="p-4 bg-slate-50/40 hover:bg-slate-50 border border-slate-100 rounded-xl transition-all cursor-pointer flex items-center justify-between gap-4"
+                className="p-4 bg-slate-50/40 hover:bg-slate-50 border border-slate-100 rounded-xl transition-all cursor-pointer flex items-center justify-between gap-4 overflow-hidden"
               >
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <h4 className="text-sm font-bold text-slate-900">{vendor.companyName}</h4>
+                <div className="space-y-1 flex-1 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0 flex-wrap">
+                    <h4 className="text-sm font-bold text-slate-900 break-all line-clamp-1" title={vendor.companyName}>{vendor.companyName}</h4>
                     {vendor.status === "Approved" ? (
-                      <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100">
+                      <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-100 shrink-0">
                         <UserCheck className="w-3 h-3" /> Onboard Approved
                       </span>
                     ) : (
-                      <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-red-700 bg-red-50 px-2 py-0.5 rounded-full border border-red-100">
+                      <span className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-red-700 bg-red-50 px-2 py-0.5 rounded-full border border-red-100 shrink-0">
                         <UserX className="w-3 h-3" /> Rejected Shell
                       </span>
                     )}
@@ -297,7 +297,7 @@ export default function ProcurementDashboard({ vendors, onVendorSelect, onStatus
                   </div>
                 </div>
 
-                <div className="text-right flex items-center gap-4 text-xs">
+                <div className="text-right flex items-center gap-4 text-xs shrink-0">
                   <div className="hidden sm:block">
                     <div className="text-xxs text-slate-400 font-bold uppercase">Weighted Integrity</div>
                     <div className="font-semibold text-slate-800">{vendor.riskScore}% Profile</div>
