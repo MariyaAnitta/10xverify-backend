@@ -121,45 +121,119 @@
 @media print {
   @page {
     size: A4 portrait;
-    margin: 10mm;
+    margin: 12mm 10mm 12mm 10mm;
   }
-  body * {
-    visibility: hidden;
+  
+  /* Reset html, body, and wrapper height so no trailing blank pages are generated */
+  html, body {
+    height: auto !important;
+    min-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    font-size: 11pt !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
-  #vendor-dossier, #vendor-dossier * {
-    visibility: visible;
+
+  #applet-root {
+    min-height: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    display: block !important;
   }
-  #vendor-dossier {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100% !important;
-    max-width: 100% !important;
-    border: none !important;
-    box-shadow: none !important;
+
+  main {
     padding: 0 !important;
     margin: 0 !important;
-    background: white !important;
+    max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* Completely remove non-printable chrome from the layout without reserving space */
+  header, nav, footer, button, .print\:hidden, [role="button"], #monitoring-alerts-banner {
+    display: none !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Make sure #vendor-dossier flows naturally without absolute positioning */
+  #vendor-dossier {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
     color: #0f172a !important;
   }
-  #vendor-dossier .grid {
-    display: grid !important;
+
+  /* Crisp font rendering, proper line-height, and uniform text alignment throughout */
+  #vendor-dossier, #vendor-dossier * {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
+    text-rendering: optimizeLegibility !important;
+    line-height: 1.45 !important;
   }
-  /* Avoid page breaks inside cards */
-  #vendor-dossier .bg-white {
+
+  /* Avoid awkward breaks inside individual cards and summary blocks */
+  #vendor-dossier .rounded-xl,
+  #vendor-dossier .rounded-2xl {
     break-inside: avoid !important;
     page-break-inside: avoid !important;
   }
-  /* Prevent text overflow in print layout */
+
+  /* Do NOT avoid break on outer multi-card containers */
+  #vendor-dossier > div,
+  #vendor-dossier .space-y-6,
+  #vendor-dossier .space-y-4,
+  #vendor-dossier .space-y-3 {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+
+  /* Optimized 3-column and 2-column print grids */
+  #vendor-dossier .grid {
+    display: grid !important;
+    gap: 12px !important;
+  }
+  
+  #vendor-dossier .grid-cols-1.md\:grid-cols-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+  }
+
+  #vendor-dossier .grid-cols-1.md\:grid-cols-2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+
+  /* Prevent text overflow and awkward line breaks */
   #vendor-dossier * {
     overflow-wrap: break-word !important;
   }
+
   .break-all {
     word-break: break-all !important;
   }
-  header, nav, footer, button, .print\:hidden, [role="button"] {
-    display: none !important;
-    height: 0 !important;
-    overflow: hidden !important;
+
+  /* Ensure card borders and light backgrounds print cleanly */
+  #vendor-dossier .bg-slate-50,
+  #vendor-dossier .bg-slate-50\/50,
+  #vendor-dossier .bg-slate-50\/60,
+  #vendor-dossier .bg-slate-50\/30 {
+    background-color: #f8fafc !important;
+  }
+
+  #vendor-dossier .border-slate-100 {
+    border-color: #e2e8f0 !important;
   }
 }
