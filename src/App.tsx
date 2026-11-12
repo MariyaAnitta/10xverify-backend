@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Shield, Brain, Sparkles, Database, HelpCircle, Activity, LayoutGrid, CheckSquare, Settings, ClipboardList, ShieldCheck } from "lucide-react";
-import { VendorScreening, DashboardMetrics } from "./types";
+import { VendorScreening, DashboardMetrics, RiskRating } from "./types";
 import ExecutiveDashboard from "./components/ExecutiveDashboard";
 import ProcurementDashboard from "./components/ProcurementDashboard";
 import ComplianceDashboard from "./components/ComplianceDashboard";
