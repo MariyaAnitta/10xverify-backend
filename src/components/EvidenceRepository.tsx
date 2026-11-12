@@ -26,6 +26,21 @@ export default function EvidenceRepository() {
     fetchLogs();
   }, []);
 
+  useEffect(() => {
+    if (selectedLog) {
+      const originalStyle = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === "Escape") setSelectedLog(null);
+      };
+      window.addEventListener("keydown", handleKeyDown);
+      return () => {
+        document.body.style.overflow = originalStyle;
+        window.removeEventListener("keydown", handleKeyDown);
+      };
+    }
+  }, [selectedLog]);
+
   const filteredLogs = logs.filter(log => {
     const s = searchTerm.toLowerCase();
     return (
@@ -134,8 +149,14 @@ export default function EvidenceRepository() {
 
       {/* Payload Inspect Modal */}
       {selectedLog && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-slate-950 border border-slate-800 text-slate-350 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl relative">
+        <div 
+          onClick={() => setSelectedLog(null)}
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-slate-950 border border-slate-800 text-slate-350 rounded-2xl w-full max-w-2xl overflow-hidden shadow-2xl relative"
+          >
             <button
               onClick={() => setSelectedLog(null)}
               className="absolute right-4 top-4 p-1.5 bg-slate-900 border border-slate-800 hover:bg-slate-800 rounded-lg text-slate-450 hover:text-white transition-all cursor-pointer"

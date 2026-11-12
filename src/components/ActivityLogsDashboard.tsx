@@ -48,6 +48,21 @@ export default function ActivityLogsDashboard() {
     fetchLogs();
   }, []);
 
+  useEffect(() => {
+    if (selectedLog) {
+      const originalStyle = document.body.style.overflow;
+      document.body.style.overflow = "hidden";
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === "Escape") setSelectedLog(null);
+      };
+      window.addEventListener("keydown", handleKeyDown);
+      return () => {
+        document.body.style.overflow = originalStyle;
+        window.removeEventListener("keydown", handleKeyDown);
+      };
+    }
+  }, [selectedLog]);
+
   const filteredLogs = logs.filter(log => {
     // Action category filter
     if (selectedFilter === "LOGINS") {
@@ -444,8 +459,14 @@ export default function ActivityLogsDashboard() {
 
       {/* Modal: Detailed Audit Record Inspector */}
       {selectedLog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in">
-          <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+        <div 
+          onClick={() => setSelectedLog(null)}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs animate-fade-in"
+        >
+          <div 
+            onClick={(e) => e.stopPropagation()}
+            className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-200 space-y-4"
+          >
             
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">

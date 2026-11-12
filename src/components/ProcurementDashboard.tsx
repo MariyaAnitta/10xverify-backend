@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Check, X, ShieldAlert, Clock, ArrowRight, UserCheck, UserX, MessageSquare, Briefcase, CheckCircle } from "lucide-react";
+import { Check, X, ShieldAlert, Clock, ArrowRight, UserCheck, UserX, MessageSquare, Briefcase, CheckCircle, Search } from "lucide-react";
 import { VendorScreening, RiskRating } from "../types";
 import { AnimatePresence } from "motion/react";
 
@@ -13,9 +13,33 @@ interface ProcurementDashboardProps {
 export default function ProcurementDashboard({ vendors, onVendorSelect, onStatusChange, currentUser }: ProcurementDashboardProps) {
   const [activeTab, setActiveTab ] = useState<"pending" | "vetted">("pending");
   const [commentInput, setCommentInput] = useState<Record<string, string>>({});
+  const [searchQuery, setSearchQuery] = useState("");
 
   const pendingQueue = vendors.filter(v => v.status === "Pending" || v.status === "In Progress" || v.status === "Completed");
   const vettedQueue = vendors.filter(v => v.status === "Approved" || v.status === "Rejected");
+
+  const filteredPending = pendingQueue.filter(v => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    return (
+      (v.companyName || "").toLowerCase().includes(q) ||
+      (v.industry || "").toLowerCase().includes(q) ||
+      (v.country || "").toLowerCase().includes(q) ||
+      (v.website || "").toLowerCase().includes(q) ||
+      (v.executiveSummary || "").toLowerCase().includes(q)
+    );
+  });
+
+  const filteredVetted = vettedQueue.filter(v => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase().trim();
+    return (
+      (v.companyName || "").toLowerCase().includes(q) ||
+      (v.industry || "").toLowerCase().includes(q) ||
+      (v.country || "").toLowerCase().includes(q) ||
+      (v.website || "").toLowerCase().includes(q)
+    );
+  });
 
   const handleAction = (id: string, action: "Approved" | "Rejected") => {
     onStatusChange(id, action);
@@ -106,6 +130,27 @@ export default function ProcurementDashboard({ vendors, onVendorSelect, onStatus
         </div>
       </div>
 
+      {/* Search Bar */}
+      <div className="relative">
+        <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder={`Search ${activeTab === "pending" ? "Vetting Queue" : "Onboard Status"} by company name, industry, country, or keyword...`}
+          className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border border-slate-200/90 rounded-xl text-xs font-medium focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 transition-all placeholder:text-slate-400"
+        />
+        {searchQuery && (
+          <button
+            onClick={() => setSearchQuery("")}
+            className="absolute right-3 top-2.5 p-0.5 text-slate-400 hover:text-slate-600 rounded-md hover:bg-slate-200/60 transition-all"
+            title="Clear search"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
       <AnimatePresence mode="wait">
         {activeTab === "pending" ? (
           <div className="space-y-4">
@@ -115,8 +160,16 @@ export default function ProcurementDashboard({ vendors, onVendorSelect, onStatus
                 <h3 className="text-sm font-bold text-slate-700">Vetting Queue Empty!</h3>
                 <p className="text-xs text-slate-400 mt-1">All screened vendors have been processed or moved to history pools.</p>
               </div>
+            ) : filteredPending.length === 0 ? (
+              <div className="text-center py-12 bg-slate-50/70 border border-dashed border-slate-250 rounded-xl">
+                <Search className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                <h3 className="text-sm font-bold text-slate-700">No matching vendors in Vetting Queue</h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  No records match "{searchQuery}". Clear your search or try another keyword.
+                </p>
+              </div>
             ) : (
-              pendingQueue.map(vendor => (
+              filteredPending.map(vendor => (
                 <div
                   key={vendor.id}
                   className="bg-white border border-slate-100 rounded-xl p-5 hover:shadow-xxs transition-all flex flex-col md:flex-row items-stretch justify-between gap-6"
@@ -205,7 +258,22 @@ export default function ProcurementDashboard({ vendors, onVendorSelect, onStatus
           </div>
         ) : (
           <div className="space-y-4">
-            {vettedQueue.map(vendor => (
+            {vettedQueue.length === 0 ? (
+              <div className="text-center py-16 bg-slate-50 border border-dashed border-slate-250 rounded-xl">
+                <UserCheck className="w-12 h-12 text-slate-300 mx-auto mb-3" />
+                <h3 className="text-sm font-bold text-slate-700">No Actioned Vendors Yet</h3>
+                <p className="text-xs text-slate-400 mt-1">Vendors approved or rejected from the vetting queue will appear here.</p>
+              </div>
+            ) : filteredVetted.length === 0 ? (
+              <div className="text-center py-12 bg-slate-50/70 border border-dashed border-slate-250 rounded-xl">
+                <Search className="w-8 h-8 text-slate-300 mx-auto mb-2" />
+                <h3 className="text-sm font-bold text-slate-700">No matching records in Onboard Status</h3>
+                <p className="text-xs text-slate-400 mt-1">
+                  No records match "{searchQuery}". Clear your search or try another keyword.
+                </p>
+              </div>
+            ) : (
+              filteredVetted.map(vendor => (
               <div
                 key={vendor.id}
                 onClick={() => onVendorSelect(vendor)}
@@ -239,7 +307,7 @@ export default function ProcurementDashboard({ vendors, onVendorSelect, onStatus
                   </div>
                 </div>
               </div>
-            ))}
+            )))}
           </div>
         )}
       </AnimatePresence>
