@@ -185,8 +185,8 @@ export default function ActivityLogsDashboard() {
   };
 
   const exportCSV = () => {
-    // Export all available audit records in the compliance ledger
-    const recordsToExport = logs.length > 0 ? logs : filteredLogs;
+    // Export the currently active filtered view (all 380+ records on "All Events", or the filtered subset if a filter is selected)
+    const recordsToExport = filteredLogs;
     if (recordsToExport.length === 0) return;
 
     const headers = ["Timestamp", "Date", "Time", "User Email", "User Name", "User Role", "Action", "Target", "Details", "IP Address", "Status"];

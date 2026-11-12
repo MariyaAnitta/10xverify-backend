@@ -660,7 +660,7 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
                               dbVendor?.riskRating === "RED" || dbVendor?.status === "Rejected" ? "bg-red-500 text-white shadow-sm shadow-red-500/20" :
                               "bg-slate-700 text-white"
                             }`}>
-                              {dbVendor?.status === "Approved" ? "APPROVED" : dbVendor?.riskRating === "GREEN" ? "Green – Low Risk" : dbVendor?.riskRating === "AMBER" ? "Amber – Moderate Risk" : dbVendor?.riskRating === "RED" ? "Red – High Risk" : dbVendor?.riskRating === "BLACK" ? "Black – Blocked" : (dbVendor?.riskRating || "IN REVIEW")}
+                              {dbVendor?.status === "Approved" ? "APPROVED" : dbVendor?.riskRating === "GREEN" ? "Low Risk" : dbVendor?.riskRating === "AMBER" ? "Moderate Risk" : dbVendor?.riskRating === "RED" ? "High Risk" : dbVendor?.riskRating === "BLACK" ? "Blocked" : (dbVendor?.riskRating || "IN REVIEW")}
                             </div>
                           )}
                         </div>

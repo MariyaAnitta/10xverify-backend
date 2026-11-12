@@ -60,10 +60,10 @@ export default function ProcurementDashboard({ vendors, onVendorSelect, onStatus
 
   const getRiskClassification = (rating: RiskRating) => {
     switch (rating) {
-      case RiskRating.GREEN: return "Green – Low Risk";
-      case RiskRating.AMBER: return "Amber – Moderate Risk";
-      case RiskRating.RED: return "Red – High Risk";
-      case RiskRating.BLACK: return "Black – Blocked";
+      case RiskRating.GREEN: return "Low Risk";
+      case RiskRating.AMBER: return "Moderate Risk";
+      case RiskRating.RED: return "High Risk";
+      case RiskRating.BLACK: return "Blocked";
       default: return rating;
     }
   };

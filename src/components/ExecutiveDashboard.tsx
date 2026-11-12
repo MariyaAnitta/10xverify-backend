@@ -132,13 +132,13 @@ export default function ExecutiveDashboard({ vendors, metrics, onVendorSelect, o
   const getRiskBadge = (rating: RiskRating) => {
     switch (rating) {
       case RiskRating.GREEN:
-        return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-full"><span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>Green – Low Risk</span>;
+        return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 text-emerald-700 text-xs font-semibold rounded-full"><span className="w-1.5 h-1.5 bg-emerald-500 rounded-full"></span>Low Risk</span>;
       case RiskRating.AMBER:
-        return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-semibold rounded-full"><span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>Amber – Moderate Risk</span>;
+        return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-semibold rounded-full"><span className="w-1.5 h-1.5 bg-amber-500 rounded-full"></span>Moderate Risk</span>;
       case RiskRating.RED:
-        return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-50 text-red-700 text-xs font-semibold rounded-full animate-pulse"><span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping"></span>Red – High Risk</span>;
+        return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-red-50 text-red-700 text-xs font-semibold rounded-full animate-pulse"><span className="w-1.5 h-1.5 bg-red-500 rounded-full animate-ping"></span>High Risk</span>;
       case RiskRating.BLACK:
-        return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-800 text-xs font-semibold rounded-full"><span className="w-1.5 h-1.5 bg-slate-900 rounded-full"></span>Black – Blocked</span>;
+        return <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-900 text-white text-xs font-semibold rounded-full"><span className="w-1.5 h-1.5 bg-red-500 rounded-full"></span>Blocked</span>;
     }
   };
 

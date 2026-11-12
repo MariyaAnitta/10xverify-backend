@@ -246,7 +246,7 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
             </div>
 
             <div className={`text-center font-bold px-4 py-2 ${getRiskBadgeClass(vendor.riskRating)} rounded-xl text-xs uppercase tracking-wider shadow`}>
-              {vendor.riskRating === "GREEN" ? "Green – Low Risk" : vendor.riskRating === "AMBER" ? "Amber – Moderate Risk" : vendor.riskRating === "RED" ? "Red – High Risk" : "Black – Blocked"}
+              {vendor.riskRating === "GREEN" ? "Low Risk" : vendor.riskRating === "AMBER" ? "Moderate Risk" : vendor.riskRating === "RED" ? "High Risk" : "Blocked"}
             </div>
           </div>
         </div>
