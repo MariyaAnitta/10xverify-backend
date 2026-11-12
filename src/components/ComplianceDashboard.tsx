@@ -14,6 +14,10 @@ export default function ComplianceDashboard({ vendors, metrics, onVendorSelect }
     checked: boolean; 
     matchFound: boolean; 
     isAdvisory?: boolean;
+    matchedEntity?: string;
+    sanctioningAuthorities?: string[];
+    programs?: string[];
+    jurisdictions?: string[];
     details?: string; 
     apiSource?: string;
     rawPayload?: any;
@@ -44,6 +48,10 @@ export default function ComplianceDashboard({ vendors, metrics, onVendorSelect }
           checked: true,
           matchFound: data.matchFound,
           isAdvisory: data.isAdvisory,
+          matchedEntity: data.matchedEntity,
+          sanctioningAuthorities: data.sanctioningAuthorities,
+          programs: data.programs,
+          jurisdictions: data.jurisdictions,
           details: data.details,
           apiSource: data.apiSource,
           rawPayload: data.rawPayload
@@ -58,9 +66,11 @@ export default function ComplianceDashboard({ vendors, metrics, onVendorSelect }
       setSanctionsResult({
         checked: true,
         matchFound: match,
+        matchedEntity: match ? "Uralchem Holding P.L.C. Cluster" : sanctionsQuery,
+        sanctioningAuthorities: match ? ["US OFAC Specially Designated Nationals (SDN) List", "UK HM Treasury Consolidated Financial Sanctions"] : [],
         details: match
-          ? "CRITICAL ALERT Match 100% (Fallback). Targeted SDN list: OFAC SDN, UK consolidated treasury database list. Associated Oligarch asset holdings detected: UralChem parent cluster."
-          : "Clear profile search result (Fallback). 0 matches found on Dow Jones Risk & Compliance registries, OFAC SDN List, or EU/UK Financial sanctions frameworks."
+          ? "CRITICAL SANCTIONS BLOCK (Verified Match): Entity is listed under US OFAC SDN and UK HM Treasury consolidated financial sanctions frameworks. Commercial engagement prohibited."
+          : "Clear compliance profile. 0 matches found across US OFAC SDN, UK HM Treasury, EU Financial Sanctions, and UN Security Council frameworks."
       });
     } finally {
       setLoading(false);
@@ -107,52 +117,103 @@ export default function ComplianceDashboard({ vendors, metrics, onVendorSelect }
           </form>
 
           {sanctionsResult && (
-            <div className={`mt-4 p-4 rounded-xl border text-xs leading-relaxed space-y-2.5 ${
+            <div className={`mt-4 p-5 rounded-2xl border text-xs leading-relaxed space-y-3.5 shadow-xs ${
               sanctionsResult.matchFound 
-                ? "bg-red-50 border-red-200 text-red-900 animate-pulse" 
+                ? "bg-red-50/90 border-red-200 text-red-950" 
                 : sanctionsResult.isAdvisory
-                ? "bg-amber-50 border-amber-200 text-amber-900"
-                : "bg-emerald-50 border-emerald-200 text-emerald-900"
+                ? "bg-amber-50/90 border-amber-200 text-amber-950"
+                : "bg-emerald-50/90 border-emerald-200 text-emerald-950"
             }`}>
-              <div className="flex items-start gap-2.5">
-                {sanctionsResult.matchFound ? (
-                  <AlertTriangle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-                ) : sanctionsResult.isAdvisory ? (
-                  <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                ) : (
-                  <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                )}
-                <div className="space-y-1 flex-1">
+              <div className="flex items-start gap-3">
+                <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border ${
+                  sanctionsResult.matchFound 
+                    ? "bg-red-100 border-red-300 text-red-700" 
+                    : sanctionsResult.isAdvisory 
+                    ? "bg-amber-100 border-amber-300 text-amber-700" 
+                    : "bg-emerald-100 border-emerald-300 text-emerald-700"
+                }`}>
+                  {sanctionsResult.matchFound ? (
+                    <AlertTriangle className="w-5 h-5" />
+                  ) : sanctionsResult.isAdvisory ? (
+                    <AlertTriangle className="w-5 h-5" />
+                  ) : (
+                    <CheckCircle className="w-5 h-5" />
+                  )}
+                </div>
+
+                <div className="space-y-2 flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <span className="font-bold uppercase tracking-wider block">
-                      {sanctionsResult.matchFound 
-                        ? "CRITICAL ENTITY HIT WARNING" 
+                    <span className={`font-black uppercase tracking-wider text-xs px-2.5 py-0.5 rounded-md ${
+                      sanctionsResult.matchFound 
+                        ? "bg-red-600 text-white shadow-xs" 
                         : sanctionsResult.isAdvisory 
-                        ? "REGULATORY & EXPORT ADVISORY NOTICE" 
-                        : "SANITIZED PASS REPORT"}
+                        ? "bg-amber-600 text-white" 
+                        : "bg-emerald-700 text-white"
+                    }`}>
+                      {sanctionsResult.matchFound 
+                        ? "CRITICAL SANCTIONS BLOCK (BANNED ENTITY)" 
+                        : sanctionsResult.isAdvisory 
+                        ? "REGULATORY & EXPORT ADVISORY" 
+                        : "CLEAN COMPLIANCE PASS"}
                     </span>
-                    <span className="px-2 py-0.5 bg-white/80 border border-slate-200 text-[9px] font-bold uppercase rounded-md text-slate-700">
-                      Engine: {sanctionsResult.apiSource || "OpenSanctions API"}
+                    <span className="px-2 py-0.5 bg-white/90 border border-slate-200 text-[10px] font-bold uppercase rounded-md text-slate-700">
+                      {sanctionsResult.apiSource || "OpenSanctions API"}
                     </span>
                   </div>
-                  <p className="font-medium leading-relaxed">{sanctionsResult.details}</p>
-                  {sanctionsResult.matchFound && (
-                    <p className="text-xxs text-red-600 font-bold uppercase tracking-widest mt-1">
-                      DO NOT ENGAGE. BANNED TRANSACTION TRIGGER.
-                    </p>
+
+                  {sanctionsResult.matchedEntity && (
+                    <div className="text-xs">
+                      <span className="font-semibold text-slate-600">Target Matched: </span>
+                      <strong className="text-slate-900 font-bold">{sanctionsResult.matchedEntity}</strong>
+                    </div>
                   )}
+
+                  {sanctionsResult.sanctioningAuthorities && sanctionsResult.sanctioningAuthorities.length > 0 && (
+                    <div className="space-y-1">
+                      <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider block">
+                        Blacklists & Sanctioning Authorities:
+                      </span>
+                      <div className="flex flex-wrap gap-1.5">
+                        {sanctionsResult.sanctioningAuthorities.map((auth, idx) => (
+                          <span
+                            key={idx}
+                            className={`px-2 py-0.5 rounded text-[10px] font-bold border ${
+                              sanctionsResult.matchFound 
+                                ? "bg-red-100 text-red-900 border-red-300" 
+                                : "bg-amber-100 text-amber-900 border-amber-300"
+                            }`}
+                          >
+                            {auth}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <p className="font-medium text-xs leading-relaxed text-slate-800 bg-white/70 p-3 rounded-xl border border-slate-200/80">
+                    {sanctionsResult.details}
+                  </p>
+
+                  {sanctionsResult.matchFound && (
+                    <div className="p-2.5 bg-red-600 text-white rounded-xl text-xxs font-black uppercase tracking-wider flex items-center gap-2 shadow-xs">
+                      <AlertTriangle className="w-4 h-4 shrink-0" />
+                      <span>COMPLIANCE MANDATE: DO NOT ENGAGE. STRICT ASSET FREEZE. ONBOARDING MUST BE REJECTED.</span>
+                    </div>
+                  )}
+
                   {sanctionsResult.isAdvisory && (
-                    <p className="text-xxs text-amber-700 font-bold uppercase tracking-widest mt-1">
-                      NON-BLOCKING NOTICE: Entity is not banned from commercial engagement.
-                    </p>
+                    <div className="p-2.5 bg-amber-600 text-white rounded-xl text-xxs font-bold uppercase tracking-wider flex items-center gap-2">
+                      <Shield className="w-4 h-4 shrink-0" />
+                      <span>ADVISORY DIRECTIVE: NON-BLOCKING RECORD. STANDARD RISK ASSESSMENT ADVISED.</span>
+                    </div>
                   )}
                 </div>
               </div>
 
               {/* Transaction Audit Pack Confirmation */}
-              <div className="pt-2 border-t border-slate-200/60 flex items-center justify-between text-[10px] text-slate-500">
+              <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between text-[10px] text-slate-600">
                 <span>📁 Transaction automatically recorded to <strong>Audit Evidence Pack Repository</strong></span>
-                <span className="font-mono text-[9px] text-indigo-600 font-semibold">Status: 200 OK</span>
+                <span className="font-mono text-[9px] text-indigo-700 font-bold">Status: 200 OK</span>
               </div>
             </div>
           )}

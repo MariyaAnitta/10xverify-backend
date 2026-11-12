@@ -406,12 +406,18 @@ export default function VendorPortal({ currentUser, onLogout }: VendorPortalProp
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-1.5 md:col-span-2">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">Full Legal Entity Name</label>
-                        <input type="text" value={businessInfo.legalName} onChange={e => setBusinessInfo({...businessInfo, legalName: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" placeholder="e.g. Al-Mutawa Medical Supply Co" />
+                        <div className="flex justify-between items-center">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">Full Legal Entity Name</label>
+                          <span className="text-[10px] text-slate-400 font-mono">{businessInfo.legalName.length}/100</span>
+                        </div>
+                        <input type="text" maxLength={100} value={businessInfo.legalName} onChange={e => setBusinessInfo({...businessInfo, legalName: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" placeholder="e.g. Al-Mutawa Medical Supply Co" />
                       </div>
                       <div className="space-y-1.5">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">Corporate Website / Domain</label>
-                        <input type="text" value={businessInfo.website} onChange={e => setBusinessInfo({...businessInfo, website: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" placeholder="e.g. almutawamedical.com" />
+                        <div className="flex justify-between items-center">
+                          <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">Corporate Website / Domain</label>
+                          <span className="text-[10px] text-slate-400 font-mono">{businessInfo.website.length}/150</span>
+                        </div>
+                        <input type="text" maxLength={150} value={businessInfo.website} onChange={e => setBusinessInfo({...businessInfo, website: e.target.value})} className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500" placeholder="e.g. almutawamedical.com" />
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-[10px] font-bold text-slate-500 uppercase tracking-widest pl-1">Primary Country of Registration</label>

@@ -213,8 +213,16 @@ export default function ScreeningPortal({ onScreeningComplete, autoStartVendor, 
       setErrorMessage("Please supply a valid Company Name.");
       return;
     }
+    if (companyName.trim().length > 100) {
+      setErrorMessage("Company Name exceeds the maximum allowable limit of 100 characters.");
+      return;
+    }
     if (!website.trim()) {
       setErrorMessage("Please supply a Company Website/Domain address.");
+      return;
+    }
+    if (website.trim().length > 150) {
+      setErrorMessage("Website/Domain exceeds the maximum allowable limit of 150 characters.");
       return;
     }
     if (!isValidDomainOrUrl(website)) {
@@ -330,27 +338,35 @@ export default function ScreeningPortal({ onScreeningComplete, autoStartVendor, 
         <form onSubmit={handleSubmit} className="space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Company Name</label>
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Company Name</label>
+                <span className="text-[10px] text-slate-400 font-mono">{companyName.length}/100</span>
+              </div>
               <input
                 type="text"
                 placeholder="e.g. Novartis Pharmaceuticals"
+                maxLength={100}
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-slate-850 placeholder:text-slate-400"
                 value={companyName}
                 onChange={e => setCompanyName(e.target.value)}
               />
-              <p className="text-xxs text-slate-400">Type "Veloce" or "Uralchim" to test high-risk simulation pathways.</p>
+              <p className="text-xxs text-slate-400">Max 100 characters. Type "Veloce" or "Uralchim" to test high-risk simulation pathways.</p>
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Company Website/Domain</label>
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-semibold text-slate-600 uppercase tracking-wider">Company Website/Domain</label>
+                <span className="text-[10px] text-slate-400 font-mono">{website.length}/150</span>
+              </div>
               <input
                 type="text"
                 placeholder="e.g. novartis.com"
+                maxLength={150}
                 className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-slate-850 placeholder:text-slate-400"
                 value={website}
                 onChange={e => setWebsite(e.target.value)}
               />
-              <p className="text-xxs text-slate-400">Type "fake-phish.net" to trigger digital alert validations.</p>
+              <p className="text-xxs text-slate-400">Max 150 characters. Type "fake-phish.net" to trigger digital alert validations.</p>
             </div>
           </div>
 

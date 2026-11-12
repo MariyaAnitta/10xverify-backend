@@ -327,6 +327,26 @@ export default function App() {
     }
   };
 
+  const handleVendorUnlocked = (unlockedId: string) => {
+    setVendors(prev => {
+      const updatedList = prev.map(v => {
+        if (v.id === unlockedId) {
+          return {
+            ...v,
+            status: "Pending" as any,
+            riskRating: RiskRating.AMBER,
+            unlocked: true,
+            executiveSummary: "Application unlocked by Compliance Officer. Record reset to Pending for editing and re-screening."
+          };
+        }
+        return v;
+      });
+      setMetrics(calculateFrontendMetrics(updatedList, monitoringAlerts));
+      return updatedList;
+    });
+    fetchState(false);
+  };
+
   const selectedVendor = vendors.find(v => v.id === selectedVendorId);
 
   const handleLogout = () => {
@@ -453,13 +473,13 @@ export default function App() {
                 vendor={selectedVendor}
                 onBack={() => {
                   setSelectedVendorId(null);
-                  setActiveTab("executive"); // Route to dashboard upon return
                   fetchState();
                 }}
                 onAddComment={(comment) => handleAddComment(selectedVendor.id, comment)}
                 onDeleteVendor={handleDeleteVendor}
                 currentUser={currentUser}
                 monitoringAlerts={monitoringAlerts}
+                onVendorUnlocked={handleVendorUnlocked}
               />
             ) : (
               /* Regular workspace tabs */

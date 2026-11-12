@@ -9,9 +9,10 @@ interface VendorDetailDossierProps {
   onDeleteVendor: (id: string) => void;
   currentUser: { email: string; name: string; role: string } | null;
   monitoringAlerts?: any[];
+  onVendorUnlocked?: (id: string) => void;
 }
 
-export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDeleteVendor, currentUser, monitoringAlerts = [] }: VendorDetailDossierProps) {
+export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDeleteVendor, currentUser, monitoringAlerts = [], onVendorUnlocked }: VendorDetailDossierProps) {
   const [expandedAgent, setExpandedAgent] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
   const [pdfMode, setPdfMode] = useState(false);
@@ -101,7 +102,8 @@ export default function VendorDetailDossier({ vendor, onBack, onAddComment, onDe
                       }
                     });
                     if (res.ok) {
-                      alert(`Onboarding application for ${vendor.companyName} has been unlocked successfully. Record reset for editing and re-screening.`);
+                      alert(`Onboarding application for ${vendor.companyName} has been unlocked successfully. The Rejected/Blocked restrictions have been cleared, and the vendor has been restored to Pending in the Vetting Queue for editing and re-screening.`);
+                      onVendorUnlocked?.(vendor.id);
                       onBack();
                     } else {
                       alert("Failed to unlock vendor application.");
