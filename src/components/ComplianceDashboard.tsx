@@ -161,11 +161,21 @@ export default function ComplianceDashboard({ vendors, metrics, onVendorSelect }
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Compliance warnings details columns */}
-        <div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-6 space-y-4 flex flex-col">
-          <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider-b pb-2 border-b">Active Audit Warning Feed</h3>
+        <div className="bg-white border border-slate-100 rounded-2xl shadow-sm p-6 space-y-4">
+          <div className="flex items-center justify-between border-b pb-2">
+            <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Active Audit Warning Feed</h3>
+            <span className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-0.5 rounded-full">
+              {metrics.complianceAlerts.length} Alerts
+            </span>
+          </div>
           
-          <div className="space-y-3.5 max-h-[780px] overflow-y-auto pr-1.5 flex-1">
-            {metrics.complianceAlerts.map(alert => {
+          <div className="space-y-3.5">
+            {metrics.complianceAlerts.length === 0 ? (
+              <div className="p-8 text-center text-slate-400 text-xs">
+                No active compliance warnings recorded.
+              </div>
+            ) : (
+              metrics.complianceAlerts.map(alert => {
               const vendor = vendors.find(v => v.companyName === alert.companyName);
               return (
                 <div
@@ -197,7 +207,8 @@ export default function ComplianceDashboard({ vendors, metrics, onVendorSelect }
                   )}
                 </div>
               );
-            })}
+            })
+          )}
           </div>
         </div>
 
