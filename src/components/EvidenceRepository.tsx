@@ -1,11 +1,44 @@
-import React, { useState, useEffect } from "react";
-import { Search, Database, RefreshCw, Terminal, Eye, X } from "lucide-react";
+import React, { useState, useEffect, useRef } from "react";
+import { Search, Database, RefreshCw, Terminal, Eye, X, ChevronLeft, ChevronRight, SlidersHorizontal } from "lucide-react";
 
 export default function EvidenceRepository() {
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedLog, setSelectedLog] = useState<any | null>(null);
+
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+  const [scrollMetrics, setScrollMetrics] = useState({ scrollWidth: 0, clientWidth: 0 });
+
+  const updateScrollState = () => {
+    if (tableContainerRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current;
+      setCanScrollLeft(scrollLeft > 10);
+      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
+      setScrollMetrics({ scrollWidth, clientWidth });
+
+      if (topScrollRef.current && Math.abs(topScrollRef.current.scrollLeft - scrollLeft) > 1) {
+        topScrollRef.current.scrollLeft = scrollLeft;
+      }
+    }
+  };
+
+  const handleTopScroll = () => {
+    if (topScrollRef.current && tableContainerRef.current) {
+      tableContainerRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+    }
+  };
+
+  const scrollLeft = () => {
+    tableContainerRef.current?.scrollBy({ left: -350, behavior: "smooth" });
+  };
+
+  const scrollRight = () => {
+    tableContainerRef.current?.scrollBy({ left: 350, behavior: "smooth" });
+  };
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -51,6 +84,12 @@ export default function EvidenceRepository() {
     );
   });
 
+  useEffect(() => {
+    updateScrollState();
+    window.addEventListener("resize", updateScrollState);
+    return () => window.removeEventListener("resize", updateScrollState);
+  }, [filteredLogs, loading]);
+
   return (
     <div className="space-y-6 animate-fade-in" id="evidence-repository">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -75,21 +114,97 @@ export default function EvidenceRepository() {
       </div>
 
       <div className="bg-white border border-slate-200 rounded-2xl p-6 shadow-sm space-y-4">
-        {/* Search */}
-        <div className="relative">
-          <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search raw transactions by vendor, registry source, query parameters or status..."
-            className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-sm placeholder:text-slate-400"
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-          />
+        {/* Search & Horizontal Scroll Bar Header */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+          <div className="relative flex-1">
+            <Search className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search raw transactions by vendor, registry source, query parameters or status..."
+              className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-100 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 transition-all text-sm placeholder:text-slate-400"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+          </div>
+
+          {/* Quick Scroll Left & Right buttons right at the top */}
+          <div className="flex items-center gap-1.5 self-end sm:self-auto shrink-0 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
+            <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider px-2 hidden md:inline">
+              Horizontal Scroll:
+            </span>
+            <button
+              type="button"
+              onClick={scrollLeft}
+              disabled={!canScrollLeft}
+              title="Scroll table left"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white text-slate-700 font-bold text-xs rounded-lg border border-slate-200 shadow-2xs transition-all cursor-pointer disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="w-4 h-4 text-slate-600" />
+              <span>Scroll Left</span>
+            </button>
+            <button
+              type="button"
+              onClick={scrollRight}
+              disabled={!canScrollRight}
+              title="Scroll table right"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white text-slate-700 font-bold text-xs rounded-lg border border-slate-200 shadow-2xs transition-all cursor-pointer disabled:cursor-not-allowed"
+            >
+              <span>Scroll Right</span>
+              <ChevronRight className="w-4 h-4 text-slate-600" />
+            </button>
+          </div>
         </div>
 
-        {/* Data Grid */}
-        <div className="overflow-x-auto border border-slate-100 rounded-xl">
-          <table className="w-full text-left text-xxs border-collapse">
+        {/* Top Synchronized Horizontal Scrollbar */}
+        {scrollMetrics.scrollWidth > scrollMetrics.clientWidth && (
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50/80 border border-slate-200/80 rounded-xl text-[11px] text-slate-500">
+            <span className="font-bold text-slate-600 uppercase text-[10px] tracking-wider shrink-0 flex items-center gap-1">
+              <SlidersHorizontal className="w-3 h-3 text-slate-500" />
+              Top Scroll Bar:
+            </span>
+            <div 
+              ref={topScrollRef} 
+              onScroll={handleTopScroll}
+              className="overflow-x-auto flex-1 h-3.5 scrollbar-thin"
+              title="Drag to scroll horizontally"
+            >
+              <div style={{ width: `${scrollMetrics.scrollWidth}px`, height: "1px" }} />
+            </div>
+          </div>
+        )}
+
+        {/* Data Grid with Floating Left/Right Scroll Controls */}
+        <div className="relative group">
+          {/* Floating Left Button */}
+          {canScrollLeft && (
+            <button
+              type="button"
+              onClick={scrollLeft}
+              title="Scroll table left"
+              className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-white/95 hover:bg-white text-slate-700 shadow-lg border border-slate-200 flex items-center justify-center transition-all hover:scale-110 cursor-pointer backdrop-blur-xs"
+            >
+              <ChevronLeft className="w-4 h-4 text-slate-800" />
+            </button>
+          )}
+
+          {/* Floating Right Button */}
+          {canScrollRight && (
+            <button
+              type="button"
+              onClick={scrollRight}
+              title="Scroll table right"
+              className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-white/95 hover:bg-white text-slate-700 shadow-lg border border-slate-200 flex items-center justify-center transition-all hover:scale-110 cursor-pointer backdrop-blur-xs"
+            >
+              <ChevronRight className="w-4 h-4 text-slate-800" />
+            </button>
+          )}
+
+          <div 
+            ref={tableContainerRef}
+            onScroll={updateScrollState}
+            className="overflow-x-auto border border-slate-100 rounded-xl"
+          >
+            <table className="w-full min-w-[1050px] text-left text-xxs border-collapse">
             <thead>
               <tr className="bg-slate-50/70 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                 <th className="p-3 whitespace-nowrap">Timestamp</th>
@@ -144,6 +259,7 @@ export default function EvidenceRepository() {
               )}
             </tbody>
           </table>
+        </div>
         </div>
       </div>
 

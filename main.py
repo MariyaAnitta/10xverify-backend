@@ -1191,7 +1191,7 @@ def export_vendors_excel(request: Request):
         # Pull live audit evidence from Firestore
         evidence_logs = []
         try:
-            ev_docs = db_fs.collection("evidence_repository").stream()
+            ev_docs = db_fs.collection("evidence_logs").stream()
             for edoc in ev_docs:
                 evidence_logs.append(edoc.to_dict())
             evidence_logs.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
@@ -1364,6 +1364,17 @@ def delete_vendor(
                 db_fs.collection("vendor_queue").document(contact_email).delete()
             except Exception:
                 pass
+
+        # 4. Clean up related evidence repository logs for this vendor
+        try:
+            ev_ref = db_fs.collection("evidence_logs")
+            for ev_doc in ev_ref.where("vendorId", "==", vendor_id).stream():
+                ev_doc.reference.delete()
+            if company_name:
+                for ev_doc in ev_ref.where("companyName", "==", company_name).stream():
+                    ev_doc.reference.delete()
+        except Exception as ev_err:
+            print(f"[delete_vendor] Error cleaning evidence repository: {ev_err}")
 
         client_ip = get_client_ip(request)
         log_user_activity(
