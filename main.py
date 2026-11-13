@@ -255,11 +255,34 @@ def calculate_metrics(vendors):
     alerts = []
     for v in vendors:
         if v.get("riskRating") in ["RED", "BLACK"]:
+            sanctions_str = str(v.get("details", {}).get("sanctionsRisk", "")).lower()
+            rec = str(v.get("recommendation", "")).lower()
+            exec_summary = str(v.get("executiveSummary", "")).lower()
+
+            if "high" in sanctions_str or "sanction" in sanctions_str or "ofac" in sanctions_str or "sanction" in exec_summary:
+                alert_type = "sanction_link"
+                severity = "critical"
+            elif v.get("details", {}).get("adverseMediaFound"):
+                alert_type = "adverse_media"
+                severity = "high"
+            elif "security" in rec or "xss" in rec or "malicious" in rec or "malicious" in exec_summary:
+                alert_type = "security_threat"
+                severity = "critical"
+            elif "unverified" in rec or "unverifiable" in rec or "unverifiable" in exec_summary or "invalid" in rec:
+                alert_type = "identity_risk"
+                severity = "critical" if v.get("riskRating") == "BLACK" else "high"
+            elif v.get("riskRating") == "BLACK":
+                alert_type = "policy_block"
+                severity = "critical"
+            else:
+                alert_type = "compliance_warning"
+                severity = "high"
+
             alerts.append({
                 "id": f"alert-{v.get('id')}",
                 "companyName": v.get("companyName"),
-                "alertType": "sanction_link" if v.get("riskRating") == "BLACK" else "adverse_media",
-                "severity": "critical" if v.get("riskRating") == "BLACK" else "high",
+                "alertType": alert_type,
+                "severity": severity,
                 "description": f"Flagged by Risk Intelligence: {v.get('recommendation')}",
                 "date": v.get("screenedAt")
             })

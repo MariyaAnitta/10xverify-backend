@@ -160,14 +160,40 @@ export default function App() {
     const complianceAlerts = [
       ...vendorList
         .filter(v => ["RED", "BLACK"].includes(v.riskRating))
-        .map(v => ({
-          id: `alert-${v.id}`,
-          companyName: v.companyName,
-          alertType: (v.riskRating === "BLACK" ? "sanction_link" : "adverse_media") as any,
-          severity: (v.riskRating === "BLACK" ? "critical" : "high") as any,
-          description: `Flagged by Risk Intelligence: ${v.recommendation}`,
-          date: v.screenedAt
-        })),
+        .map(v => {
+          const sanctionsStr = String(v.details?.sanctionsRisk || "").toLowerCase();
+          const rec = String(v.recommendation || "").toLowerCase();
+          const exec = String(v.executiveSummary || "").toLowerCase();
+          
+          let alertType = "compliance_warning";
+          let severity = v.riskRating === "BLACK" ? "critical" : "high";
+
+          if (sanctionsStr.includes("high") || sanctionsStr.includes("sanction") || sanctionsStr.includes("ofac") || exec.includes("sanction")) {
+            alertType = "sanction_link";
+            severity = "critical";
+          } else if (v.details?.adverseMediaFound) {
+            alertType = "adverse_media";
+            severity = "high";
+          } else if (rec.includes("security") || rec.includes("xss") || rec.includes("malicious") || exec.includes("malicious")) {
+            alertType = "security_threat";
+            severity = "critical";
+          } else if (rec.includes("unverified") || rec.includes("unverifiable") || exec.includes("unverifiable") || rec.includes("invalid")) {
+            alertType = "identity_risk";
+            severity = v.riskRating === "BLACK" ? "critical" : "high";
+          } else if (v.riskRating === "BLACK") {
+            alertType = "policy_block";
+            severity = "critical";
+          }
+
+          return {
+            id: `alert-${v.id}`,
+            companyName: v.companyName,
+            alertType: alertType as any,
+            severity: severity as any,
+            description: `Flagged by Risk Intelligence: ${v.recommendation}`,
+            date: v.screenedAt
+          };
+        }),
       ...alerts
     ];
 

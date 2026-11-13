@@ -242,24 +242,28 @@ export default function ComplianceDashboard({ vendors, metrics, onVendorSelect }
                 <div
                   key={alert.id}
                   onClick={() => vendor && onVendorSelect(vendor)}
-                  className="p-3 bg-slate-50/50 hover:bg-slate-100 border border-slate-100 rounded-xl transition-all cursor-pointer space-y-2 flex flex-col justify-between text-xs"
+                  className="p-3.5 bg-slate-50/50 hover:bg-slate-100 border border-slate-100 rounded-xl transition-all cursor-pointer space-y-2 flex flex-col justify-between text-xs overflow-hidden"
                 >
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="font-bold text-slate-900 leading-tight">{alert.companyName}</h4>
-                      <p className="text-xxs text-slate-400 font-semibold">{alert.date} • {alert.alertType.toUpperCase().replace("_", " ")}</p>
+                  <div className="flex justify-between items-start gap-3 min-w-0">
+                    <div className="flex-1 min-w-0 space-y-0.5">
+                      <h4 className="font-bold text-slate-900 leading-tight break-all line-clamp-1" title={alert.companyName}>
+                        {alert.companyName}
+                      </h4>
+                      <p className="text-xxs text-slate-400 font-semibold truncate">
+                        {alert.date ? new Date(alert.date).toISOString().substring(0, 19).replace("T", " ") + "Z" : ""} • {alert.alertType.toUpperCase().replace("_", " ")}
+                      </p>
                     </div>
-                    <span className={`inline-block px-1.5 py-0.5 text-[8.5px] font-bold uppercase rounded ${
+                    <span className={`shrink-0 px-2 py-0.5 text-[9px] font-bold uppercase rounded ${
                       alert.severity === "critical" 
-                        ? "bg-slate-900 text-white animate-pulse" 
+                        ? "bg-slate-900 text-white" 
                         : alert.severity === "high" 
-                        ? "bg-red-50 text-red-700" 
-                        : "bg-amber-50 text-amber-700"
+                        ? "bg-red-50 text-red-700 border border-red-200" 
+                        : "bg-amber-50 text-amber-700 border border-amber-200"
                     }`}>
                       {alert.severity}
                     </span>
                   </div>
-                  <p className="text-slate-600 font-medium leading-relaxed">{alert.description}</p>
+                  <p className="text-slate-600 font-medium leading-relaxed break-words">{alert.description}</p>
                   
                   {vendor && (
                     <div className="text-xxs text-blue-600 font-bold flex items-center gap-1">
@@ -279,10 +283,12 @@ export default function ComplianceDashboard({ vendors, metrics, onVendorSelect }
           
           <div className="space-y-4">
             {vendors.map(v => (
-              <div key={v.id} className="p-4 bg-slate-50/30 border border-slate-100 rounded-xl text-xxs space-y-2">
-                <div className="flex justify-between items-center bg-white p-2 rounded border border-slate-100">
-                  <span className="font-bold text-slate-800 text-xs">{v.companyName}</span>
-                  <span className="text-slate-400 font-semibold uppercase">{v.industry}</span>
+              <div key={v.id} className="p-4 bg-slate-50/30 border border-slate-100 rounded-xl text-xxs space-y-2 overflow-hidden">
+                <div className="flex justify-between items-center bg-white p-2.5 rounded-lg border border-slate-100 gap-3 min-w-0">
+                  <span className="font-bold text-slate-800 text-xs break-all line-clamp-1 flex-1 min-w-0" title={v.companyName}>
+                    {v.companyName}
+                  </span>
+                  <span className="text-slate-400 font-semibold uppercase shrink-0 text-[10px]">{v.industry}</span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">

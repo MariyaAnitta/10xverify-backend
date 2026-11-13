@@ -446,14 +446,14 @@ export default function ExecutiveDashboard({ vendors, metrics, onVendorSelect, o
                     <AlertTriangle className="w-4.5 h-4.5 text-amber-500 shrink-0 mt-0.5" />
                   )}
  
-                  <div className="space-y-1 w-full">
-                    <div className="flex items-center justify-between font-bold gap-2">
-                      <span className="text-slate-900 line-clamp-1">{alert.companyName}</span>
+                  <div className="space-y-1 w-full min-w-0">
+                    <div className="flex items-center justify-between font-bold gap-2 min-w-0">
+                      <span className="text-slate-900 line-clamp-1 break-all" title={alert.companyName}>{alert.companyName}</span>
                       <span className="text-slate-400 font-normal shrink-0">
                         {alert.date?.includes("T") ? new Date(alert.date).toLocaleDateString() : alert.date}
                       </span>
                     </div>
-                    <p className="text-slate-600 leading-normal font-medium">{alert.description}</p>
+                    <p className="text-slate-600 leading-normal font-medium break-words">{alert.description}</p>
                     <span className={`inline-block px-1.5 py-0.5 text-[8px] font-bold uppercase rounded ${
                       alert.severity === "critical" 
                         ? "bg-slate-900 text-white" 
