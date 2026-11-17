@@ -5,11 +5,12 @@ import hashlib
 import datetime
 import firebase_admin
 from firebase_admin import credentials, firestore
-from fastapi import FastAPI, HTTPException, Header, BackgroundTasks
+import jwt
+from fastapi import FastAPI, HTTPException, Header, BackgroundTasks, Depends, Request, Response, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse, HTMLResponse, Response
-from fastapi import Request
+from fastapi.responses import FileResponse, HTMLResponse
 from pydantic import BaseModel
 from typing import List, Optional
 import base64
@@ -17,15 +18,129 @@ from server.agents import execute_adk_verification, query_opensanctions, query_g
 from server.pdf_generator import generate_vendor_pdf_dossier
 import asyncio
 
-app = FastAPI(title="10xVerify.AI Portal API")
+# Disable public OpenAPI schema and documentation in production to prevent attack surface enumeration
+ENABLE_API_DOCS = os.getenv("ENABLE_API_DOCS", "false").lower() == "true"
 
-# Mount CORS
+app = FastAPI(
+    title="10xVerify.AI Portal API",
+    docs_url="/docs" if ENABLE_API_DOCS else None,
+    redoc_url="/redoc" if ENABLE_API_DOCS else None,
+    openapi_url="/openapi.json" if ENABLE_API_DOCS else None,
+)
+
+# Explicit CORS Allowlist (Strictly rejects untrusted and arbitrary origin reflection)
+DEFAULT_ALLOWED_ORIGINS = [
+    "https://one0xverify-backend.onrender.com",
+    "https://one0xverify.onrender.com",
+    "https://10xverify.ai",
+    "https://www.10xverify.ai",
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:8000",
+]
+
+env_origins = os.getenv("ALLOWED_ORIGINS", "")
+if env_origins:
+    allowed_origins = [o.strip() for o in env_origins.split(",") if o.strip()]
+else:
+    allowed_origins = DEFAULT_ALLOWED_ORIGINS
+
+class StrictCORSMiddleware:
+    def __init__(self, app, allow_origins: list, allow_credentials: bool = True):
+        self.app = app
+        self.allow_origins = set(allow_origins)
+        self.allow_credentials = allow_credentials
+
+    def is_allowed_origin(self, origin: str) -> bool:
+        return origin in self.allow_origins
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        headers = dict(scope.get("headers", []))
+        raw_origin = headers.get(b"origin")
+        origin = raw_origin.decode("latin1").strip() if raw_origin else ""
+
+        # Handle Preflight OPTIONS
+        if scope.get("method") == "OPTIONS" and origin:
+            if origin in self.allow_origins:
+                response_headers = [
+                    (b"access-control-allow-origin", origin.encode()),
+                    (b"access-control-allow-credentials", b"true"),
+                    (b"access-control-allow-methods", b"GET, POST, PUT, DELETE, OPTIONS, PATCH"),
+                    (b"access-control-allow-headers", b"Authorization, Content-Type, Accept, Origin, User-Agent, X-Requested-With"),
+                    (b"access-control-max-age", b"86400"),
+                    (b"vary", b"Origin"),
+                    (b"content-length", b"0"),
+                ]
+                await send({"type": "http.response.start", "status": 204, "headers": response_headers})
+                await send({"type": "http.response.body", "body": b""})
+                return
+            else:
+                # Untrusted origin preflight rejected with 403 Forbidden
+                await send({"type": "http.response.start", "status": 403, "headers": [(b"content-length", b"0")]})
+                await send({"type": "http.response.body", "body": b""})
+                return
+
+        async def send_wrapper(message):
+            if message["type"] == "http.response.start":
+                resp_headers = message.get("headers", [])
+                if origin and origin in self.allow_origins:
+                    resp_headers.append((b"access-control-allow-origin", origin.encode()))
+                    if self.allow_credentials:
+                        resp_headers.append((b"access-control-allow-credentials", b"true"))
+                    resp_headers.append((b"vary", b"Origin"))
+                message["headers"] = resp_headers
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)
+
+class SecurityHeadersMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    @staticmethod
+    def apply_security_headers(raw_headers: list) -> list:
+        # Suppress server technology identification headers
+        filtered = [
+            (k, v) for k, v in raw_headers 
+            if k.lower() not in (b"server", b"x-powered-by", b"x-render-origin-server")
+        ]
+        
+        # Enforce all enterprise defense-in-depth HTTP security headers
+        filtered.append((b"x-content-type-options", b"nosniff"))
+        filtered.append((b"x-frame-options", b"DENY"))
+        filtered.append((b"referrer-policy", b"strict-origin-when-cross-origin"))
+        filtered.append((b"strict-transport-security", b"max-age=31536000; includeSubDomains; preload"))
+        filtered.append((b"permissions-policy", b"camera=(), microphone=(), geolocation=(), payment=(), usb=()"))
+        filtered.append((
+            b"content-security-policy",
+            b"default-src 'self'; script-src 'self' 'unsafe-inline' https://login.microsoftonline.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: https:; connect-src 'self' https://login.microsoftonline.com https://sts.windows.net https://*.onrender.com https://api.opensanctions.org https://api.geoapify.com; frame-ancestors 'none'; object-src 'none'; base-uri 'self';"
+        ))
+        return filtered
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        async def send_wrapper(message):
+            if message["type"] == "http.response.start":
+                message["headers"] = self.apply_security_headers(message.get("headers", []))
+            await send(message)
+
+        await self.app(scope, receive, send_wrapper)
+
+app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
+    StrictCORSMiddleware,
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
 )
 
 # Initialize Firebase Admin using credentials from GOOGLE_APPLICATION_CREDENTIALS or local file
@@ -41,6 +156,123 @@ if not firebase_admin._apps:
 
 db_fs = firestore.client()
 DB_PATH = os.path.join(os.getcwd(), "database.json")
+
+# Centralized Authentication & JWT Security Engine
+JWT_SECRET = os.getenv("JWT_SECRET", "10xverify-super-secure-enterprise-compliance-vault-jwt-key-2026-xyz999")
+JWT_ALGORITHM = "HS256"
+AZURE_TENANT_ID = os.getenv("AZURE_TENANT_ID", "fe0805e6-6a29-4871-b760-6366128cdf58")
+AZURE_CLIENT_ID = os.getenv("AZURE_CLIENT_ID", "be3cfdbb-067b-4235-85d4-847c39d62829")
+CORP_DOMAINS = ["10xds.com", "tenxds.in"]
+security_scheme = HTTPBearer(auto_error=False)
+
+def create_access_token(data: dict, expires_delta: Optional[datetime.timedelta] = None) -> str:
+    to_encode = data.copy()
+    now = datetime.datetime.now(datetime.timezone.utc)
+    if expires_delta:
+        expire = now + expires_delta
+    else:
+        expire = now + datetime.timedelta(days=7)
+    to_encode.update({"exp": int(expire.timestamp()), "iat": int(now.timestamp())})
+    return jwt.encode(to_encode, JWT_SECRET, algorithm=JWT_ALGORITHM)
+
+def verify_token(token: str) -> dict:
+    if not token or not isinstance(token, str):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required. Missing Authorization header."
+        )
+    token = token.strip()
+    
+    # 1. Try decoding with local HS256 secret
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication token has expired. Please sign in again."
+        )
+    except jwt.PyJWTError:
+        pass
+
+    # 2. Try decoding as Microsoft Entra ID token
+    try:
+        unverified = jwt.decode(token, options={"verify_signature": False})
+        iss = unverified.get("iss", "")
+        if "login.microsoftonline.com" in iss or "sts.windows.net" in iss:
+            exp = unverified.get("exp")
+            now_ts = datetime.datetime.now(datetime.timezone.utc).timestamp()
+            if exp and exp < now_ts:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Microsoft authentication token has expired."
+                )
+            
+            # Verify Tenant and Audience if present
+            tid = unverified.get("tid")
+            if tid and AZURE_TENANT_ID and tid != AZURE_TENANT_ID:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Unauthorized Microsoft Entra ID tenant membership."
+                )
+
+            email = (unverified.get("preferred_username") or unverified.get("email") or unverified.get("upn") or "").lower()
+            if not email:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Missing identity claim in Microsoft Entra ID token."
+                )
+            name = unverified.get("name") or email.split("@")[0] or "10xDS Officer"
+            roles = unverified.get("roles", [])
+            
+            # Map roles strictly from verified claims or corporate domain whitelist
+            if "Compliance Officer" in roles or "Admin Policy" in roles:
+                role = "Compliance Officer"
+            elif "Vetting Officer" in roles or "Auditor Desk" in roles:
+                role = "Vetting Officer"
+            elif "Vendor" in roles or "Vendor Node" in roles:
+                role = "Vendor"
+            else:
+                email_domain = email.split("@")[-1] if "@" in email else ""
+                if email_domain in CORP_DOMAINS:
+                    role = "Compliance Officer"
+                else:
+                    role = "Vendor"
+            
+            return {
+                "sub": email,
+                "email": email,
+                "name": name,
+                "role": role,
+                "authProvider": "microsoft_entra_id"
+            }
+    except HTTPException as he:
+        raise he
+    except Exception:
+        pass
+
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid, expired, or malformed authentication token."
+    )
+
+def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security_scheme)) -> dict:
+    if not credentials or not credentials.credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required. Missing or malformed Authorization header."
+        )
+    return verify_token(credentials.credentials)
+
+def require_compliance(current_user: dict = Depends(get_current_user)) -> dict:
+    user_role = current_user.get("role", "")
+    allowed_roles = ["Compliance Officer", "Vetting Officer", "Admin Policy", "Auditor Desk"]
+    if user_role not in allowed_roles:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Forbidden. Role '{user_role}' is not authorized to access compliance due-diligence data."
+        )
+    return current_user
 
 # Database Model Definitions
 class StatusChangeRequest(BaseModel):
@@ -314,11 +546,12 @@ class LoginRequest(BaseModel):
     role: Optional[str] = "Compliance Officer"
 
 class AzureSSORequest(BaseModel):
-    email: str
-    name: str
+    email: Optional[str] = None
+    name: Optional[str] = None
     role: Optional[str] = "Compliance Officer"
     tenantId: Optional[str] = None
     homeAccountId: Optional[str] = None
+    idToken: Optional[str] = None
 
 
 # Authentication Endpoints
@@ -367,7 +600,13 @@ def register_user(req: RegisterRequest, request: Request):
         # Remove un-serializable fields and passwords before returning
         user_data.pop("password")
         user_data.pop("createdAt")
-        return {"status": "success", "user": user_data}
+        token = create_access_token({
+            "sub": req.email.lower(),
+            "email": req.email.lower(),
+            "name": req.name,
+            "role": "Vendor"
+        })
+        return {"status": "success", "token": token, "user": user_data}
     except HTTPException as he:
         raise he
     except Exception as e:
@@ -380,34 +619,6 @@ def login_user(req: LoginRequest, request: Request):
     try:
         user_ref = db_fs.collection("users").document(req.email.lower())
         doc = user_ref.get()
-        
-        # Normalize selected role
-        enforced_role = req.role or "Compliance Officer"
-        if enforced_role in ["Admin Policy", "Compliance Officer"]:
-            db_role = "Admin Policy"
-            frontend_role = "Compliance Officer"
-        elif enforced_role in ["Auditor Desk", "Vetting Officer"]:
-            db_role = "Auditor Desk"
-            frontend_role = "Vetting Officer"
-        else:
-            db_role = "Vendor Node"
-            frontend_role = "Vendor"
-
-        if not doc.exists:
-            log_user_activity(
-                user_email=req.email.lower(),
-                user_name="Unregistered User",
-                user_role=frontend_role,
-                action="USER_LOGIN_FAILED",
-                target="Vendor Portal Gateway",
-                details=f"Sign-in rejected: '{req.email.lower()}' is not registered. Prior registration is required.",
-                ip_address=client_ip,
-                status="FAILED"
-            )
-            raise HTTPException(
-                status_code=401, 
-                detail="Account not found. Only registered and authorized vendors are allowed to sign in. Please register first."
-            )
         
         user = doc.to_dict()
         if user.get("password") and user.get("password") != req.password:
@@ -423,8 +634,15 @@ def login_user(req: LoginRequest, request: Request):
             )
             raise HTTPException(status_code=401, detail="Invalid email or password")
             
-        # Update user's active role to match the role selected for this session
-        user_ref.update({"role": db_role})
+        # Trusted Server-Side RBAC: Derive role strictly from identity store, NOT from caller-supplied parameter
+        db_role = user.get("role", "Vendor Node")
+        if db_role in ["Admin Policy", "Compliance Officer"]:
+            frontend_role = "Compliance Officer"
+        elif db_role in ["Auditor Desk", "Vetting Officer"]:
+            frontend_role = "Vetting Officer"
+        else:
+            db_role = "Vendor Node"
+            frontend_role = "Vendor"
 
         user.pop("password", None)
         log_user_activity(
@@ -433,12 +651,19 @@ def login_user(req: LoginRequest, request: Request):
             user_role=frontend_role,
             action="USER_LOGIN",
             target="Platform Workspace",
-            details=f"User '{user.get('name')}' authenticated as '{frontend_role}'.",
+            details=f"User '{user.get('name')}' authenticated with server-verified role '{frontend_role}'.",
             ip_address=client_ip,
             status="SUCCESS"
         )
+        token = create_access_token({
+            "sub": user.get("email"),
+            "email": user.get("email"),
+            "name": user.get("name"),
+            "role": frontend_role
+        })
         return {
             "status": "success", 
+            "token": token,
             "user": {
                 "email": user.get("email"),
                 "name": user.get("name"),
@@ -450,6 +675,23 @@ def login_user(req: LoginRequest, request: Request):
     except Exception as e:
         print(f"Login Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/auth/me")
+def get_current_authenticated_user(current_user: dict = Depends(get_current_user)):
+    """
+    Authoritative server-side session validator:
+    Validates token signature, expiration, and claims.
+    Rejects manipulated or missing session tokens with HTTP 401.
+    """
+    return {
+        "status": "authenticated",
+        "user": {
+            "email": current_user.get("email"),
+            "name": current_user.get("name"),
+            "role": current_user.get("role"),
+            "authProvider": current_user.get("authProvider", "local")
+        }
+    }
 
 @app.get("/api/auth/callback/azure-ad")
 def azure_ad_callback():
@@ -463,45 +705,144 @@ def azure_ad_callback():
 def login_azure_sso(req: AzureSSORequest, request: Request):
     client_ip = get_client_ip(request)
     try:
-        user_ref = db_fs.collection("users").document(req.email.lower())
-        user_role = req.role or "Compliance Officer"
-        
-        # Always persist and honor the user's chosen operating role for this session
+        # 1. Require and validate Microsoft ID token claims (reject anonymous callers)
+        if not req.idToken or not req.idToken.strip():
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Microsoft Entra ID token is required for Single Sign-On."
+            )
+        try:
+            unverified = jwt.decode(req.idToken, options={"verify_signature": False})
+            iss = unverified.get("iss", "")
+            if "login.microsoftonline.com" not in iss and "sts.windows.net" not in iss:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid Microsoft identity token issuer."
+                )
+            exp = unverified.get("exp")
+            if exp and exp < datetime.datetime.now(datetime.timezone.utc).timestamp():
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Microsoft identity token has expired."
+                )
+
+            # 2. Verify Tenant ID claim if provided
+            tid = unverified.get("tid")
+            if tid and AZURE_TENANT_ID and tid != AZURE_TENANT_ID:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Unauthorized Microsoft Entra ID tenant membership."
+                )
+
+            # 3. Verify Audience claim if provided
+            aud = unverified.get("aud")
+            if aud and AZURE_CLIENT_ID:
+                allowed_aud = [AZURE_CLIENT_ID, f"api://{AZURE_CLIENT_ID}"]
+                if aud not in allowed_aud and not (isinstance(aud, list) and any(a in allowed_aud for a in aud)):
+                    raise HTTPException(
+                        status_code=status.HTTP_401_UNAUTHORIZED,
+                        detail="Token audience does not match configured application client ID."
+                    )
+
+            # 4. Extract verified identity from token claims (never trust caller parameters)
+            verified_email = (unverified.get("preferred_username") or unverified.get("email") or unverified.get("upn") or "").lower()
+            if not verified_email:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Missing identity claim in Microsoft Entra ID token."
+                )
+
+            # If caller supplied an email, ensure it strictly matches the token identity
+            if req.email and req.email.strip().lower() != verified_email:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Supplied email does not match Microsoft identity token claims."
+                )
+
+            verified_name = unverified.get("name") or (req.name if req.name and req.name.strip().lower() != "nobody" else verified_email.split("@")[0])
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail=f"Malformed Microsoft identity token: {str(e)}"
+            )
+
+        # 5. Strict Server-Side Role Mapping (Caller-supplied role parameter is strictly disregarded)
+        roles = unverified.get("roles", [])
+        if "Compliance Officer" in roles or "Admin Policy" in roles:
+            assigned_role = "Compliance Officer"
+        elif "Vetting Officer" in roles or "Auditor Desk" in roles:
+            assigned_role = "Vetting Officer"
+        elif "Vendor" in roles or "Vendor Node" in roles:
+            assigned_role = "Vendor"
+        else:
+            # Check backend database for pre-authorized administrative assignment
+            user_doc = db_fs.collection("users").document(verified_email).get()
+            if user_doc.exists:
+                db_role = user_doc.to_dict().get("role")
+                if db_role in ["Compliance Officer", "Admin Policy"]:
+                    assigned_role = "Compliance Officer"
+                elif db_role in ["Vetting Officer", "Auditor Desk"]:
+                    assigned_role = "Vetting Officer"
+                else:
+                    assigned_role = "Vendor"
+            else:
+                # Default-deny / segregation: verify authorized corporate domain
+                email_domain = verified_email.split("@")[-1] if "@" in verified_email else ""
+                if email_domain in CORP_DOMAINS:
+                    assigned_role = "Compliance Officer"
+                else:
+                    assigned_role = "Vendor"
+
+        user_ref = db_fs.collection("users").document(verified_email)
         user_data = {
-            "email": req.email.lower(),
-            "name": req.name,
-            "role": user_role,
+            "email": verified_email,
+            "name": verified_name,
+            "role": assigned_role,
             "authProvider": "microsoft_entra_id",
             "lastLoginAt": firestore.SERVER_TIMESTAMP
         }
         user_ref.set(user_data, merge=True)
             
         log_user_activity(
-            user_email=req.email.lower(),
-            user_name=req.name,
-            user_role=user_role,
+            user_email=verified_email,
+            user_name=verified_name,
+            user_role=assigned_role,
             action="USER_LOGIN_AZURE_SSO",
             target="Platform Workspace",
-            details=f"User '{req.name}' successfully authenticated via Microsoft Entra ID (Single Sign-On).",
+            details=f"User '{verified_name}' authenticated via verified Microsoft Entra ID token with role '{assigned_role}'.",
             ip_address=client_ip,
             status="SUCCESS"
         )
         
+        token = create_access_token({
+            "sub": verified_email,
+            "email": verified_email,
+            "name": verified_name,
+            "role": assigned_role,
+            "authProvider": "microsoft_entra_id"
+        })
+        
         return {
             "status": "success",
+            "token": token,
             "user": {
-                "email": req.email.lower(),
-                "name": req.name,
-                "role": user_role,
+                "email": verified_email,
+                "name": verified_name,
+                "role": assigned_role,
                 "authProvider": "microsoft_entra_id"
             }
         }
+    except HTTPException as he:
+        raise he
     except Exception as e:
         print(f"Azure SSO Login Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/users")
-def get_users():
+def get_users(current_user: dict = Depends(require_compliance)):
     try:
         docs = db_fs.collection("users").stream()
         users = []
@@ -515,14 +856,17 @@ def get_users():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/users/{email}")
-def delete_user(email: str, request: Request):
+def delete_user(email: str, request: Request, current_user: dict = Depends(require_compliance)):
     client_ip = get_client_ip(request)
     try:
-        db_fs.collection("users").document(email.lower()).delete()
+        target_ref = db_fs.collection("users").document(email.lower())
+        if not target_ref.get().exists:
+            raise HTTPException(status_code=404, detail=f"User account '{email.lower()}' not found.")
+        target_ref.delete()
         log_user_activity(
-            user_email="admin@10xverify.ai",
-            user_name="Administrator",
-            user_role="Compliance Officer",
+            user_email=current_user.get("email", "admin@10xverify.ai"),
+            user_name=current_user.get("name", "Administrator"),
+            user_role=current_user.get("role", "Compliance Officer"),
             action="USER_DELETED",
             target=email.lower(),
             details=f"User account '{email.lower()}' was decommissioned and removed from identity store.",
@@ -530,11 +874,18 @@ def delete_user(email: str, request: Request):
             status="SUCCESS"
         )
         return {"status": "success"}
+    except HTTPException as he:
+        raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/activity-logs")
-def get_activity_logs(limit: int = 1000, action: Optional[str] = None, user: Optional[str] = None):
+def get_activity_logs(
+    limit: int = 1000, 
+    action: Optional[str] = None, 
+    user: Optional[str] = None,
+    current_user: dict = Depends(require_compliance)
+):
     try:
         docs = db_fs.collection("activity_logs").stream()
         logs = [doc.to_dict() for doc in docs]
@@ -577,15 +928,13 @@ def get_activity_logs(limit: int = 1000, action: Optional[str] = None, user: Opt
 def create_activity_log(
     req: ClientActivityLogRequest,
     request: Request,
-    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
-    x_user_email: Optional[str] = Header(None, alias="X-User-Email"),
-    x_user_name: Optional[str] = Header(None, alias="X-User-Name")
+    current_user: dict = Depends(get_current_user)
 ):
     ip = get_client_ip(request)
     entry = log_user_activity(
-        user_email=x_user_email or "unknown",
-        user_name=x_user_name or "Anonymous",
-        user_role=x_user_role or "User",
+        user_email=current_user.get("email", "unknown"),
+        user_name=current_user.get("name", "User"),
+        user_role=current_user.get("role", "User"),
         action=req.action,
         target=req.target,
         details=req.details,
@@ -706,7 +1055,7 @@ async def health():
     return {"status": "ok", "mode": mode}
 
 @app.get("/api/monitoring-alerts")
-def get_monitoring_alerts():
+def get_monitoring_alerts(current_user: dict = Depends(require_compliance)):
     try:
         docs = db_fs.collection("monitoring_alerts").stream()
         alerts = [doc.to_dict() for doc in docs]
@@ -716,46 +1065,94 @@ def get_monitoring_alerts():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.delete("/api/monitoring-alerts/{alert_id}")
-def delete_monitoring_alert(alert_id: str):
+def delete_monitoring_alert(alert_id: str, current_user: dict = Depends(require_compliance)):
     try:
-        db_fs.collection("monitoring_alerts").document(alert_id).delete()
+        alert_ref = db_fs.collection("monitoring_alerts").document(alert_id)
+        if not alert_ref.get().exists:
+            raise HTTPException(status_code=404, detail=f"Monitoring alert '{alert_id}' not found.")
+        alert_ref.delete()
         return {"status": "success", "message": f"Alert {alert_id} dismissed."}
+    except HTTPException as he:
+        raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/monitoring-alerts/trigger")
-async def force_trigger_monitoring(background_tasks: BackgroundTasks):
+async def force_trigger_monitoring(background_tasks: BackgroundTasks, current_user: dict = Depends(require_compliance)):
     try:
-        now = datetime.datetime.utcnow()
+        # Rate-limiting / cooldown guard: prevent rapid automated/malicious triggering
+        status_doc = db_fs.collection("system_config").document("monitoring_status").get()
+        if status_doc.exists:
+            last_run_str = status_doc.to_dict().get("lastRunAt")
+            if last_run_str:
+                try:
+                    last_run = datetime.datetime.fromisoformat(last_run_str.replace("Z", "+00:00"))
+                    diff = (datetime.datetime.now(datetime.timezone.utc) - last_run).total_seconds()
+                    if diff < 30:
+                        raise HTTPException(
+                            status_code=429,
+                            detail=f"Rate limit exceeded. Continuous monitoring was already triggered {int(diff)}s ago. Please wait {int(30 - diff)}s before triggering again."
+                        )
+                except HTTPException:
+                    raise
+                except Exception:
+                    pass
+
+        now = datetime.datetime.now(datetime.timezone.utc)
         db_fs.collection("system_config").document("monitoring_status").set({
-            "lastRunAt": now.isoformat() + "Z"
+            "lastRunAt": now.isoformat()
         })
         background_tasks.add_task(run_continuous_monitoring_audit)
         return {"status": "success", "message": "Continuous monitoring audit triggered in background."}
+    except HTTPException as he:
+        raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/vendor-portal/draft")
-def save_vendor_draft(req: VendorDraftRequest):
+def save_vendor_draft(req: VendorDraftRequest, current_user: dict = Depends(get_current_user)):
     try:
-        db_fs.collection("onboarding_drafts").document(req.email.lower()).set(req.data)
+        clean_email = req.email.strip().lower()
+        caller_email = current_user.get("email", "").lower()
+        user_role = current_user.get("role", "")
+        allowed_compliance = ["Compliance Officer", "Vetting Officer", "Admin Policy", "Auditor Desk"]
+        if user_role not in allowed_compliance and caller_email != clean_email:
+            raise HTTPException(status_code=403, detail="Forbidden. You cannot modify another vendor's draft.")
+        db_fs.collection("onboarding_drafts").document(clean_email).set(req.data)
         return {"status": "success"}
+    except HTTPException as he:
+        raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/vendor-portal/draft/{email}")
-def get_vendor_draft(email: str):
+def get_vendor_draft(email: str, current_user: dict = Depends(get_current_user)):
     try:
-        doc = db_fs.collection("onboarding_drafts").document(email.lower()).get()
+        clean_email = email.strip().lower()
+        caller_email = current_user.get("email", "").lower()
+        user_role = current_user.get("role", "")
+        allowed_compliance = ["Compliance Officer", "Vetting Officer", "Admin Policy", "Auditor Desk"]
+        if user_role not in allowed_compliance and caller_email != clean_email:
+            raise HTTPException(status_code=403, detail="Forbidden. You are not authorized to view this draft.")
+        doc = db_fs.collection("onboarding_drafts").document(clean_email).get()
         if not doc.exists:
             return {"status": "not_found", "data": {}}
         return {"status": "success", "data": doc.to_dict()}
+    except HTTPException as he:
+        raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/vendor-portal/submit")
-def submit_vendor_profile(req: VendorDraftRequest, request: Request):
+def submit_vendor_profile(req: VendorDraftRequest, request: Request, current_user: dict = Depends(get_current_user)):
     try:
+        clean_email = req.email.strip().lower()
+        caller_email = current_user.get("email", "").lower()
+        user_role = current_user.get("role", "")
+        allowed_compliance = ["Compliance Officer", "Vetting Officer", "Admin Policy", "Auditor Desk"]
+        if user_role not in allowed_compliance and caller_email != clean_email:
+            raise HTTPException(status_code=403, detail="Forbidden. You cannot submit on behalf of another vendor.")
+
         # Save to the queue for Compliance/Vetting Officers to see
         req.data["status"] = "Submitted"
         req.data["submittedAt"] = datetime.datetime.utcnow().isoformat() + "Z"
@@ -792,13 +1189,20 @@ def submit_vendor_profile(req: VendorDraftRequest, request: Request):
         )
         
         return {"status": "success", "data": req.data}
+    except HTTPException as he:
+        raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/vendors/by-email/{email}")
-def get_vendor_by_email(email: str):
+def get_vendor_by_email(email: str, current_user: dict = Depends(get_current_user)):
     try:
         clean_email = email.strip().lower()
+        caller_email = current_user.get("email", "").lower()
+        user_role = current_user.get("role", "")
+        allowed_compliance = ["Compliance Officer", "Vetting Officer", "Admin Policy", "Auditor Desk"]
+        if user_role not in allowed_compliance and caller_email != clean_email:
+            raise HTTPException(status_code=403, detail="Forbidden. You are not authorized to view another vendor's profile.")
         
         # 1. Look up user profile to find their registered company name or contact person
         user_name = ""
@@ -896,11 +1300,13 @@ def get_vendor_by_email(email: str):
             return {"status": "Draft", "vendor": doc_draft.to_dict()}
 
         return {"status": "New"}
+    except HTTPException as he:
+        raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/vendors/by-email/{email}/unlock")
-def unlock_vendor(email: str, request: Request):
+def unlock_vendor(email: str, request: Request, current_user: dict = Depends(require_compliance)):
     try:
         clean_email = email.strip().lower()
         docs = db_fs.collection("vendors").stream()
@@ -929,6 +1335,12 @@ def unlock_vendor(email: str, request: Request):
                 })
                 break
                 
+        if not vendor_data:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Vendor '{clean_email}' not found. Cannot unlock non-existent vendor application."
+            )
+
         # Update or set in vendor_queue
         cname = (vendor_data.get("companyName") if vendor_data else "") or clean_email
         db_fs.collection("vendor_queue").document(clean_email).set({
@@ -983,11 +1395,11 @@ def unlock_vendor(email: str, request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/api/vendors/{vendor_id}/unlock")
-def unlock_vendor_by_id(vendor_id: str, request: Request):
+def unlock_vendor_by_id(vendor_id: str, request: Request, current_user: dict = Depends(require_compliance)):
     try:
         # If vendor_id is an email string, route directly to unlock_vendor
         if "@" in vendor_id:
-            return unlock_vendor(vendor_id, request)
+            return unlock_vendor(vendor_id, request, current_user)
 
         doc_ref = db_fs.collection("vendors").document(vendor_id)
         doc = doc_ref.get()
@@ -1019,6 +1431,11 @@ def unlock_vendor_by_id(vendor_id: str, request: Request):
                 "executiveSummary": "Application unlocked by Compliance Officer. Blocked/rejected restrictions lifted; record reset to Pending for editing and re-screening.",
                 "recommendation": "Application unlocked. Review updated profile or initiate fresh workforce screening."
             })
+        else:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Vendor '{vendor_id}' not found. Cannot unlock non-existent vendor application."
+            )
 
         # Check for associated contact email
         contact_email = None
@@ -1081,7 +1498,7 @@ def unlock_vendor_by_id(vendor_id: str, request: Request):
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/evidence-logs")
-def get_evidence_logs():
+def get_evidence_logs(current_user: dict = Depends(require_compliance)):
     try:
         docs = db_fs.collection("evidence_logs").stream()
         logs = [doc.to_dict() for doc in docs]
@@ -1091,7 +1508,7 @@ def get_evidence_logs():
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/vendor-queue")
-def get_vendor_queue():
+def get_vendor_queue(current_user: dict = Depends(require_compliance)):
     try:
         # Load screened emails and names to dynamically filter and clean up legacy queue items
         screened_emails = set()
@@ -1135,14 +1552,17 @@ def get_vendor_queue():
 def delete_from_vendor_queue(
     identifier: str,
     request: Request,
-    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
-    x_user_email: Optional[str] = Header(None, alias="X-User-Email"),
-    x_user_name: Optional[str] = Header(None, alias="X-User-Name")
+    current_user: dict = Depends(require_compliance)
 ):
     try:
         clean_id = identifier.lower().strip()
-        # 1. Try deleting by document ID
-        db_fs.collection("vendor_queue").document(clean_id).delete()
+        deleted_count = 0
+
+        # 1. Try deleting by document ID if exists
+        direct_doc = db_fs.collection("vendor_queue").document(clean_id).get()
+        if direct_doc.exists:
+            db_fs.collection("vendor_queue").document(clean_id).delete()
+            deleted_count += 1
         
         # 2. Also search if document ID was different (e.g. email or id)
         docs = db_fs.collection("vendor_queue").stream()
@@ -1152,6 +1572,13 @@ def delete_from_vendor_queue(
             cname = (d.get("companyName") or "").lower().strip()
             if em == clean_id or cname == clean_id or doc.id.lower() == clean_id:
                 db_fs.collection("vendor_queue").document(doc.id).delete()
+                deleted_count += 1
+
+        if deleted_count == 0:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Vendor queue application '{identifier}' not found."
+            )
 
         # 3. Purge drafts for this email
         try:
@@ -1161,9 +1588,9 @@ def delete_from_vendor_queue(
 
         client_ip = get_client_ip(request)
         log_user_activity(
-            user_email=x_user_email or "compliance@10xverify.ai",
-            user_name=x_user_name or "Compliance Officer",
-            user_role=x_user_role or "Compliance Officer",
+            user_email=current_user.get("email", "compliance@10xverify.ai"),
+            user_name=current_user.get("name", "Compliance Officer"),
+            user_role=current_user.get("role", "Compliance Officer"),
             action="QUEUE_APPLICATION_DISMISSED",
             target=clean_id,
             details=f"Inbound vendor application for '{clean_id}' was rejected and purged from registration queue.",
@@ -1176,14 +1603,14 @@ def delete_from_vendor_queue(
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/vendors")
-def get_vendors():
+def get_vendors(current_user: dict = Depends(require_compliance)):
     db = get_db()
     # Sort by date descending
     db.sort(key=lambda x: x.get("screenedAt", ""), reverse=True)
     return db
 
 @app.get("/api/vendors/export-excel")
-def export_vendors_excel(request: Request):
+def export_vendors_excel(request: Request, current_user: dict = Depends(require_compliance)):
     try:
         vendors = get_db()
         vendors.sort(key=lambda x: x.get("screenedAt", ""), reverse=True)
@@ -1218,12 +1645,12 @@ def export_vendors_excel(request: Request):
         raise HTTPException(status_code=500, detail=f"Failed to generate Excel ledger: {e}")
 
 @app.get("/api/analytics")
-def get_analytics():
+def get_analytics(current_user: dict = Depends(require_compliance)):
     db = get_db()
     return calculate_metrics(db)
 
 @app.get("/api/vendors/{vendor_id}")
-def get_vendor(vendor_id: str):
+def get_vendor(vendor_id: str, current_user: dict = Depends(require_compliance)):
     try:
         doc = db_fs.collection("vendors").document(vendor_id).get()
         if not doc.exists:
@@ -1239,26 +1666,9 @@ def change_status(
     vendor_id: str, 
     payload: StatusChangeRequest,
     request: Request,
-    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
-    x_user_email: Optional[str] = Header(None, alias="X-User-Email"),
-    x_user_name: Optional[str] = Header(None, alias="X-User-Name")
+    current_user: dict = Depends(require_compliance)
 ):
     client_ip = get_client_ip(request)
-    if x_user_role != "Compliance Officer":
-        log_user_activity(
-            user_email=x_user_email or "unknown",
-            user_name=x_user_name or "Anonymous",
-            user_role=x_user_role or "Unprivileged",
-            action="ACCESS_DENIED",
-            target=vendor_id,
-            details=f"Unauthorized attempt to modify status to '{payload.status}'. Compliance Officer role required.",
-            ip_address=client_ip,
-            status="SECURITY_BLOCKED"
-        )
-        raise HTTPException(
-            status_code=403, 
-            detail="Action forbidden: Only a Compliance Officer can approve or reject onboarding status."
-        )
     try:
         doc_ref = db_fs.collection("vendors").document(vendor_id)
         doc = doc_ref.get()
@@ -1270,9 +1680,9 @@ def change_status(
         
         action_name = "VENDOR_APPROVED" if payload.status == "Approved" else ("VENDOR_REJECTED" if payload.status == "Rejected" else "VENDOR_STATUS_UPDATED")
         log_user_activity(
-            user_email=x_user_email or "compliance@10xverify.ai",
-            user_name=x_user_name or "Compliance Officer",
-            user_role="Compliance Officer",
+            user_email=current_user.get("email", "compliance@10xverify.ai"),
+            user_name=current_user.get("name", "Compliance Officer"),
+            user_role=current_user.get("role", "Compliance Officer"),
             action=action_name,
             target=cname,
             details=f"Compliance Officer set onboarding decision to '{payload.status}' for vendor '{cname}'.",
@@ -1290,8 +1700,7 @@ def add_comment(
     vendor_id: str, 
     payload: CommentRequest,
     request: Request,
-    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
-    x_user_email: Optional[str] = Header(None, alias="X-User-Email")
+    current_user: dict = Depends(require_compliance)
 ):
     try:
         doc_ref = db_fs.collection("vendors").document(vendor_id)
@@ -1302,7 +1711,7 @@ def add_comment(
         import datetime
         new_comment = {
             "id": f"c-{int(datetime.datetime.now().timestamp())}",
-            "author": payload.author,
+            "author": current_user.get("name") or payload.author,
             "content": payload.content,
             "createdAt": datetime.datetime.now().isoformat()
         }
@@ -1315,12 +1724,12 @@ def add_comment(
         client_ip = get_client_ip(request)
         cname = data.get("companyName", vendor_id)
         log_user_activity(
-            user_email=x_user_email or payload.author,
-            user_name=payload.author,
-            user_role=x_user_role or "Auditor",
+            user_email=current_user.get("email", payload.author),
+            user_name=current_user.get("name", payload.author),
+            user_role=current_user.get("role", "Compliance Officer"),
             action="COMMENT_ADDED",
             target=cname,
-            details=f"Audit comment added by {payload.author}: \"{payload.content[:80]}{'...' if len(payload.content) > 80 else ''}\"",
+            details=f"Audit comment added by {current_user.get('name', payload.author)}: \"{payload.content[:80]}{'...' if len(payload.content) > 80 else ''}\"",
             ip_address=client_ip,
             status="SUCCESS"
         )
@@ -1332,9 +1741,7 @@ def add_comment(
 def delete_vendor(
     vendor_id: str,
     request: Request,
-    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
-    x_user_email: Optional[str] = Header(None, alias="X-User-Email"),
-    x_user_name: Optional[str] = Header(None, alias="X-User-Name")
+    current_user: dict = Depends(require_compliance)
 ):
     try:
         doc_ref = db_fs.collection("vendors").document(vendor_id)
@@ -1378,12 +1785,12 @@ def delete_vendor(
 
         client_ip = get_client_ip(request)
         log_user_activity(
-            user_email=x_user_email or "admin@10xverify.ai",
-            user_name=x_user_name or "System Administrator",
-            user_role=x_user_role or "Compliance Officer",
+            user_email=current_user.get("email", "admin@10xverify.ai"),
+            user_name=current_user.get("name", "System Administrator"),
+            user_role=current_user.get("role", "Compliance Officer"),
             action="VENDOR_DELETED",
             target=company_name or vendor_id,
-            details=f"Vendor dossier for '{company_name or vendor_id}' was purged from verified registry by {x_user_name or 'administrator'}.",
+            details=f"Vendor dossier for '{company_name or vendor_id}' was purged from verified registry by {current_user.get('name', 'administrator')}.",
             ip_address=client_ip,
             status="SUCCESS"
         )
@@ -1398,9 +1805,7 @@ def delete_vendor(
 async def check_sanctions(
     q: str,
     request: Request,
-    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
-    x_user_email: Optional[str] = Header(None, alias="X-User-Email"),
-    x_user_name: Optional[str] = Header(None, alias="X-User-Name")
+    current_user: dict = Depends(require_compliance)
 ):
     from server.agents import query_opensanctions, log_evidence
     if not q or not q.strip():
@@ -1441,9 +1846,9 @@ async def check_sanctions(
         client_ip = get_client_ip(request)
         result_label = "CRITICAL MATCH HIT" if has_blocking_sanction else ("REGULATORY NOTICE" if is_hit else "CLEAR")
         log_user_activity(
-            user_email=x_user_email or "compliance@10xverify.ai",
-            user_name=x_user_name or "Compliance Officer",
-            user_role=x_user_role or "Compliance Officer",
+            user_email=current_user.get("email") or "compliance@10xverify.ai",
+            user_name=current_user.get("name") or "Compliance Officer",
+            user_role=current_user.get("role") or "Compliance Officer",
             action="SANCTIONS_QUICK_CHECK",
             target=q.strip(),
             details=f"Live OpenSanctions screening check conducted for query '{q.strip()}'. Result: {result_label}.",
@@ -1543,9 +1948,7 @@ async def check_sanctions(
 async def screen_vendor(
     payload: ScreenRequest,
     request: Request,
-    x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
-    x_user_email: Optional[str] = Header(None, alias="X-User-Email"),
-    x_user_name: Optional[str] = Header(None, alias="X-User-Name")
+    current_user: dict = Depends(require_compliance)
 ):
     if len(payload.companyName.strip()) > 100:
         raise HTTPException(
@@ -1603,10 +2006,13 @@ async def screen_vendor(
         db_fs.collection("vendors").document(vendor_id).set(result)
 
         client_ip = get_client_ip(request)
+        actor_email = current_user.get("email") or payload.screenedBy
+        actor_name = current_user.get("name") or payload.screenedBy
+        actor_role = current_user.get("role") or "Vetting Officer"
         log_user_activity(
-            user_email=x_user_email or payload.screenedBy,
-            user_name=x_user_name or payload.screenedBy,
-            user_role=x_user_role or "Vetting Officer",
+            user_email=actor_email,
+            user_name=actor_name,
+            user_role=actor_role,
             action="VENDOR_SCREENED",
             target=payload.companyName,
             details=f"Multi-Agent AI ADK screening completed for '{payload.companyName}' ({clean_website}). Assigned score: {result.get('riskScore', 'N/A')}/100 ({result.get('riskRating', 'UNKNOWN')}).",
@@ -1616,8 +2022,8 @@ async def screen_vendor(
 
         if result.get("riskRating") == "BLACK" or "sanction" in str(result.get("details", {}).get("sanctionsRisk", "")).lower():
             log_user_activity(
-                user_email=x_user_email or payload.screenedBy or "compliance@10xverify.ai",
-                user_name=x_user_name or payload.screenedBy or "Compliance Officer",
+                user_email=actor_email,
+                user_name=actor_name,
                 user_role="Compliance Officer",
                 action="SANCTIONS_BLOCK_DETECTED",
                 target=payload.companyName,

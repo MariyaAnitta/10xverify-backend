@@ -61,15 +61,26 @@ export default function AuthScreen({ onLogin }: AuthScreenProps) {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Authentication failed");
+      if (!res.ok || !data.token) {
+        throw new Error(data.detail || "Authentication failed. No valid server session credential received.");
+      }
 
-      const loggedInUser = {
-        email: data.user.email,
-        name: data.user.name,
-        role: "Vendor"
-      };
+      // Save token and independently verify with authoritative server-side endpoint
+      localStorage.setItem("10xverify_token", data.token);
 
-      onLogin(loggedInUser);
+      const verifyRes = await fetch("/api/auth/me", {
+        headers: { Authorization: `Bearer ${data.token}` }
+      });
+      if (!verifyRes.ok) {
+        localStorage.removeItem("10xverify_token");
+        throw new Error("Session token verification failed. Manipulated or invalid credentials rejected.");
+      }
+
+      const verifyData = await verifyRes.json();
+      const verifiedUser = verifyData.user;
+      localStorage.setItem("10xverify_user", JSON.stringify(verifiedUser));
+
+      onLogin(verifiedUser);
     } catch (err: any) {
       setError(err.message);
     } finally {

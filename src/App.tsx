@@ -77,10 +77,49 @@ export default function App() {
 
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
     const saved = localStorage.getItem("10xverify_user");
-    return saved ? JSON.parse(saved) : null;
+    const token = localStorage.getItem("10xverify_token");
+    return (saved && token) ? JSON.parse(saved) : null;
   });
 
   const [monitoringAlerts, setMonitoringAlerts] = useState<any[]>([]);
+
+  // Validate server-side session token on mount
+  useEffect(() => {
+    const token = localStorage.getItem("10xverify_token");
+    if (!token) {
+      if (currentUser) setCurrentUser(null);
+      localStorage.removeItem("10xverify_user");
+      return;
+    }
+
+    fetch("/api/auth/me", {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => {
+        if (!res.ok) throw new Error("Invalid or expired session token");
+        return res.json();
+      })
+      .then(data => {
+        setCurrentUser(data.user);
+        localStorage.setItem("10xverify_user", JSON.stringify(data.user));
+      })
+      .catch(() => {
+        setCurrentUser(null);
+        localStorage.removeItem("10xverify_token");
+        localStorage.removeItem("10xverify_user");
+      });
+  }, []);
+
+  // Listen for global auth invalidation events from fetch interceptor (e.g. on HTTP 401)
+  useEffect(() => {
+    const handleAuthInvalidated = () => {
+      setCurrentUser(null);
+      localStorage.removeItem("10xverify_token");
+      localStorage.removeItem("10xverify_user");
+    };
+    window.addEventListener("10xverify_auth_invalidated", handleAuthInvalidated);
+    return () => window.removeEventListener("10xverify_auth_invalidated", handleAuthInvalidated);
+  }, []);
 
   // Listen for Microsoft Direct Login (Redirect flow - No Popups!)
   useEffect(() => {
@@ -103,15 +142,26 @@ export default function App() {
               name: userName,
               role: chosenRole,
               tenantId: account.tenantId,
-              homeAccountId: account.homeAccountId
+              homeAccountId: account.homeAccountId,
+              idToken: response.idToken
             })
           });
 
+          if (!res.ok) {
+            throw new Error("Microsoft SSO authentication rejected by server.");
+          }
+
           const data = await res.json();
+          if (!data.token) {
+            throw new Error("No cryptographic session token received from SSO endpoint.");
+          }
+
+          localStorage.setItem("10xverify_token", data.token);
+
           const loggedInUser: UserProfile = {
             email: data.user?.email || userEmail,
             name: data.user?.name || userName,
-            role: chosenRole || data.user?.role || "Compliance Officer"
+            role: data.user?.role || "Compliance Officer"
           };
           setCurrentUser(loggedInUser);
           localStorage.setItem("10xverify_user", JSON.stringify(loggedInUser));
@@ -376,8 +426,9 @@ export default function App() {
   const selectedVendor = vendors.find(v => v.id === selectedVendorId);
 
   const handleLogout = () => {
-    setCurrentUser(null);
     localStorage.removeItem("10xverify_user");
+    localStorage.removeItem("10xverify_token");
+    setCurrentUser(null);
   };
 
   if (!currentUser) {
