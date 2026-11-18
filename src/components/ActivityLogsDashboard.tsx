@@ -18,10 +18,7 @@ import {
   Eye, 
   X,
   ExternalLink,
-  ShieldAlert,
-  ChevronLeft,
-  ChevronRight,
-  SlidersHorizontal
+  ShieldAlert
 } from "lucide-react";
 import { ActivityLog } from "../types";
 
@@ -31,39 +28,6 @@ export default function ActivityLogsDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedFilter, setSelectedFilter] = useState("ALL");
   const [selectedLog, setSelectedLog] = useState<ActivityLog | null>(null);
-
-  const tableContainerRef = useRef<HTMLDivElement>(null);
-  const topScrollRef = useRef<HTMLDivElement>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
-  const [scrollMetrics, setScrollMetrics] = useState({ scrollWidth: 0, clientWidth: 0 });
-
-  const updateScrollState = () => {
-    if (tableContainerRef.current) {
-      const { scrollLeft, scrollWidth, clientWidth } = tableContainerRef.current;
-      setCanScrollLeft(scrollLeft > 10);
-      setCanScrollRight(scrollLeft < scrollWidth - clientWidth - 10);
-      setScrollMetrics({ scrollWidth, clientWidth });
-
-      if (topScrollRef.current && Math.abs(topScrollRef.current.scrollLeft - scrollLeft) > 1) {
-        topScrollRef.current.scrollLeft = scrollLeft;
-      }
-    }
-  };
-
-  const handleTopScroll = () => {
-    if (topScrollRef.current && tableContainerRef.current) {
-      tableContainerRef.current.scrollLeft = topScrollRef.current.scrollLeft;
-    }
-  };
-
-  const scrollLeft = () => {
-    tableContainerRef.current?.scrollBy({ left: -350, behavior: "smooth" });
-  };
-
-  const scrollRight = () => {
-    tableContainerRef.current?.scrollBy({ left: 350, behavior: "smooth" });
-  };
 
   const fetchLogs = async () => {
     setLoading(true);
@@ -131,12 +95,6 @@ export default function ActivityLogsDashboard() {
       (log.ipAddress || "").toLowerCase().includes(s)
     );
   });
-
-  useEffect(() => {
-    updateScrollState();
-    window.addEventListener("resize", updateScrollState);
-    return () => window.removeEventListener("resize", updateScrollState);
-  }, [filteredLogs, loading]);
 
   const getActionBadge = (action: string) => {
     switch (action) {
@@ -387,98 +345,24 @@ export default function ActivityLogsDashboard() {
                 </button>
               ))}
             </div>
-
-            {/* Quick Scroll Left & Right buttons right at the top */}
-            <div className="flex items-center gap-1.5 shrink-0 bg-slate-50 p-1 rounded-xl border border-slate-200">
-              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider px-2 hidden sm:inline">
-                Scroll Table:
-              </span>
-              <button
-                type="button"
-                onClick={scrollLeft}
-                disabled={!canScrollLeft}
-                title="Scroll table left"
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white text-slate-700 font-bold text-xs rounded-lg border border-slate-200 shadow-2xs transition-all cursor-pointer disabled:cursor-not-allowed"
-              >
-                <ChevronLeft className="w-4 h-4 text-slate-600" />
-                <span>Scroll Left</span>
-              </button>
-              <button
-                type="button"
-                onClick={scrollRight}
-                disabled={!canScrollRight}
-                title="Scroll table right"
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white text-slate-700 font-bold text-xs rounded-lg border border-slate-200 shadow-2xs transition-all cursor-pointer disabled:cursor-not-allowed"
-              >
-                <span>Scroll Right</span>
-                <ChevronRight className="w-4 h-4 text-slate-600" />
-              </button>
-            </div>
           </div>
         </div>
 
-        {/* Top Synchronized Horizontal Scrollbar */}
-        {scrollMetrics.scrollWidth > scrollMetrics.clientWidth && (
-          <div className="flex items-center gap-2 px-3 py-1.5 bg-slate-50/80 border border-slate-200/80 rounded-xl text-[11px] text-slate-500">
-            <span className="font-bold text-slate-600 uppercase text-[10px] tracking-wider shrink-0 flex items-center gap-1">
-              <SlidersHorizontal className="w-3 h-3 text-slate-500" />
-              Top Scroll Bar:
-            </span>
-            <div 
-              ref={topScrollRef} 
-              onScroll={handleTopScroll}
-              className="overflow-x-auto flex-1 h-3.5 scrollbar-thin"
-              title="Drag to scroll horizontally"
-            >
-              <div style={{ width: `${scrollMetrics.scrollWidth}px`, height: "1px" }} />
-            </div>
-          </div>
-        )}
-
-        {/* Audit Log Table with Floating Left/Right Scroll Controls */}
-        <div className="relative group">
-          {/* Floating Left Button */}
-          {canScrollLeft && (
-            <button
-              type="button"
-              onClick={scrollLeft}
-              title="Scroll table left"
-              className="absolute left-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-white/95 hover:bg-white text-slate-700 shadow-lg border border-slate-200 flex items-center justify-center transition-all hover:scale-110 cursor-pointer backdrop-blur-xs"
-            >
-              <ChevronLeft className="w-4 h-4 text-slate-800" />
-            </button>
-          )}
-
-          {/* Floating Right Button */}
-          {canScrollRight && (
-            <button
-              type="button"
-              onClick={scrollRight}
-              title="Scroll table right"
-              className="absolute right-2 top-1/2 -translate-y-1/2 z-20 w-8 h-8 rounded-full bg-white/95 hover:bg-white text-slate-700 shadow-lg border border-slate-200 flex items-center justify-center transition-all hover:scale-110 cursor-pointer backdrop-blur-xs"
-            >
-              <ChevronRight className="w-4 h-4 text-slate-800" />
-            </button>
-          )}
-
-          <div 
-            ref={tableContainerRef}
-            onScroll={updateScrollState}
-            className="overflow-x-auto border border-slate-100 rounded-xl"
-          >
-            <table className="w-full min-w-[1100px] text-left text-xxs border-collapse">
-            <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-100 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                <th className="p-3 w-40">Date & Timestamp</th>
-                <th className="p-3 w-48">Operator (Who)</th>
-                <th className="p-3 w-40">Action (What)</th>
-                <th className="p-3 w-48">Target Entity (To Whom)</th>
-                <th className="p-3">Audit Trail Narrative</th>
-                <th className="p-3 w-28 text-center">Client IP</th>
-                <th className="p-3 w-16 text-center">Inspect</th>
+        {/* Audit Log Table with docked scrollbar and sticky headers */}
+        <div className="overflow-x-auto overflow-y-auto max-h-[calc(100vh-280px)] min-h-[350px] border border-slate-200/80 rounded-xl bg-white custom-scrollbar shadow-2xs">
+          <table className="w-full min-w-[1100px] text-left text-xxs border-collapse">
+            <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-xs border-b border-slate-200 shadow-2xs">
+              <tr className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                <th className="p-3 w-40 whitespace-nowrap bg-slate-50/95">Date & Timestamp</th>
+                <th className="p-3 w-48 whitespace-nowrap bg-slate-50/95">Operator (Who)</th>
+                <th className="p-3 w-40 whitespace-nowrap bg-slate-50/95">Action (What)</th>
+                <th className="p-3 w-48 whitespace-nowrap bg-slate-50/95">Target Entity (To Whom)</th>
+                <th className="p-3 whitespace-nowrap bg-slate-50/95">Audit Trail Narrative</th>
+                <th className="p-3 w-28 text-center whitespace-nowrap bg-slate-50/95">Client IP</th>
+                <th className="p-3 w-16 text-center whitespace-nowrap bg-slate-50/95">Inspect</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-50 text-slate-700 font-medium">
+            <tbody className="divide-y divide-slate-100 text-slate-700 font-medium">
               {loading ? (
                 <tr>
                   <td colSpan={7} className="text-center py-16">
@@ -561,7 +445,6 @@ export default function ActivityLogsDashboard() {
               )}
             </tbody>
           </table>
-        </div>
         </div>
 
         {/* Footer info banner */}
